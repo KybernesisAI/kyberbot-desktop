@@ -39,6 +39,7 @@ interface AppContextValue {
   agentRoot: string | null;
   apiToken: string | null;
   serverUrl: string;
+  baseServerUrl: string;  // base URL without /agent/{name} suffix — for fleet-level endpoints
   health: HealthData | null;
   cliStatus: string;
   isReady: boolean;       // config loaded (agent root, token)
@@ -56,6 +57,7 @@ const AppContext = createContext<AppContextValue>({
   agentRoot: null,
   apiToken: null,
   serverUrl: 'http://localhost:3456',
+  baseServerUrl: 'http://localhost:3456',
   health: null,
   cliStatus: 'stopped',
   isReady: false,
@@ -213,7 +215,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      agentRoot, apiToken, serverUrl, health, cliStatus, isReady, serverReady,
+      agentRoot, apiToken, serverUrl, baseServerUrl, health, cliStatus, isReady, serverReady,
       fleetMode, agents, activeAgent, setActiveAgent, fleetStatus,
     }}>
       {children}
