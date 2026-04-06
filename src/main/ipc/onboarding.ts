@@ -5,7 +5,7 @@
  */
 
 import { ipcMain } from 'electron';
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync, copyFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 import * as yaml from 'js-yaml';
@@ -115,6 +115,48 @@ export function registerOnboardingHandlers(store: AppStore): void {
     writeFileSync(join(agentRoot, '.gitignore'),
       `node_modules/\ndata/chromadb/\nlogs/\n*.log\n.env\n`, 'utf-8');
 
+    // Copy template files from the globally installed @kyberbot/cli package
+    // This includes default skills (recall, remember, brain-note, heartbeat-task, backup),
+    // CLAUDE.md, settings, commands, skill/agent generators and templates
+    try {
+      const templateDir = findTemplateDir();
+      if (templateDir) {
+        // Create skill directories
+        for (const skill of ['remember', 'recall', 'heartbeat-task', 'brain-note', 'backup']) {
+          mkdirSync(join(agentRoot, 'skills', skill), { recursive: true });
+        }
+        mkdirSync(join(agentRoot, '.claude', 'commands'), { recursive: true });
+        mkdirSync(join(agentRoot, '.claude', 'skills', 'templates'), { recursive: true });
+        mkdirSync(join(agentRoot, '.claude', 'agents', 'templates'), { recursive: true });
+
+        // Copy template files
+        const filesToCopy = [
+          ['.claude/CLAUDE.md', '.claude/CLAUDE.md'],
+          ['.claude/settings.local.json', '.claude/settings.local.json'],
+          ['.claude/commands/kyberbot.md', '.claude/commands/kyberbot.md'],
+          ['.claude/skills/skill-generator.md', '.claude/skills/skill-generator.md'],
+          ['.claude/skills/templates/skill-template.md', '.claude/skills/templates/skill-template.md'],
+          ['.claude/agents/templates/agent-template.md', '.claude/agents/templates/agent-template.md'],
+          ['.claude/skills/agent-generator.md', '.claude/skills/agent-generator.md'],
+          ['skills/remember/SKILL.md', 'skills/remember/SKILL.md'],
+          ['skills/recall/SKILL.md', 'skills/recall/SKILL.md'],
+          ['skills/heartbeat-task/SKILL.md', 'skills/heartbeat-task/SKILL.md'],
+          ['skills/brain-note/SKILL.md', 'skills/brain-note/SKILL.md'],
+          ['skills/backup/SKILL.md', 'skills/backup/SKILL.md'],
+        ];
+
+        for (const [src, dest] of filesToCopy) {
+          const srcPath = join(templateDir, src);
+          const destPath = join(agentRoot, dest);
+          if (existsSync(srcPath)) {
+            copyFileSync(srcPath, destPath);
+          }
+        }
+      }
+    } catch {
+      // Template copy failed — non-fatal, agent still works without default skills
+    }
+
     // Try to scaffold CLAUDE.md via kyberbot skill rebuild
     try {
       const home = process.env.HOME || '';
@@ -150,6 +192,43 @@ export function registerOnboardingHandlers(store: AppStore): void {
 
     return { ok: true, path: agentRoot, token };
   });
+}
+
+/**
+ * Find the KyberBot CLI template directory from the global install.
+ * The template/ dir sits at the root of the @kyberbot/cli package.
+ */
+function findTemplateDir(): string | null {
+  const home = process.env.HOME || '';
+
+  // Check nvm installs (most common)
+  try {
+    const nvmDir = join(home, '.nvm/versions/node');
+    const versions = readdirSync(nvmDir).sort().reverse(); // newest first
+    for (const v of versions) {
+      const templateDir = join(nvmDir, v, 'lib/node_modules/@kyberbot/cli/template');
+      if (existsSync(join(templateDir, 'skills'))) return templateDir;
+    }
+  } catch {}
+
+  // Check global npm install
+  const globalPaths = [
+    '/usr/local/lib/node_modules/@kyberbot/cli/template',
+    '/opt/homebrew/lib/node_modules/@kyberbot/cli/template',
+    join(home, '.npm-global/lib/node_modules/@kyberbot/cli/template'),
+  ];
+  for (const p of globalPaths) {
+    if (existsSync(join(p, 'skills'))) return p;
+  }
+
+  // Try npm root -g
+  try {
+    const npmRoot = execSync('npm root -g', { encoding: 'utf-8', timeout: 5000 }).trim();
+    const p = join(npmRoot, '@kyberbot/cli/template');
+    if (existsSync(join(p, 'skills'))) return p;
+  } catch {}
+
+  return null;
 }
 
 function randomHex(length: number): string {
