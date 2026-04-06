@@ -43,7 +43,7 @@ function getToolMeta(name: string) {
 }
 
 export default function ChatView() {
-  const { serverUrl, apiToken, serverReady } = useApp();
+  const { serverUrl, apiToken, serverReady, activeAgent } = useApp();
   const [agentName, setAgentName] = useState('Atlas');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -62,7 +62,7 @@ export default function ChatView() {
     return h;
   }, [apiToken]);
 
-  // Load agent name and model from identity
+  // Load agent name and model from identity (re-read on agent switch)
   useEffect(() => {
     const kb = (window as any).kyberbot;
     if (!kb) return;
@@ -70,11 +70,14 @@ export default function ChatView() {
       if (id?.agent_name) setAgentName(id.agent_name);
       if (id?.claude?.model) setClaudeModel(id.claude.model);
     });
-  }, []);
+  }, [activeAgent]);
 
-  // Load most recent session on mount (like web app)
+  // Load most recent session on mount and on agent switch
   useEffect(() => {
     if (!serverReady) return;
+    // Clear current messages when switching agents
+    setMessages([]);
+    setSessionId(null);
     const loadMostRecent = async () => {
       try {
         const res = await fetch(`${serverUrl}/api/web/sessions`, { headers: authHeaders() });
@@ -87,7 +90,7 @@ export default function ChatView() {
       } catch {}
     };
     loadMostRecent();
-  }, [serverReady]);
+  }, [serverReady, activeAgent]);
 
   // Save a message to the current session
   const saveMessage = useCallback(async (sid: string, role: string, content: string, extra?: { toolCalls?: ToolCall[]; memoryUpdates?: string[] }) => {

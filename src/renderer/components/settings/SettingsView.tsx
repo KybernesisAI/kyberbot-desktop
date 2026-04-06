@@ -4,30 +4,31 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useApp } from '../../context/AppContext';
 import type { IdentityConfig, EnvConfig } from '../../../types/ipc';
 
 export default function SettingsView() {
   const kb = (window as any).kyberbot;
+  const { activeAgent, serverUrl, apiToken } = useApp();
   const [identity, setIdentity] = useState<IdentityConfig | null>(null);
   const [env, setEnv] = useState<EnvConfig>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
 
+  // Re-read identity and env when agent switches
   useEffect(() => {
     if (!kb) return;
     kb.config.readIdentity().then((id: IdentityConfig | null) => setIdentity(id));
     kb.config.readEnv().then((e: EnvConfig) => setEnv(e));
-  }, []);
+  }, [activeAgent]);
 
   useEffect(() => {
     const fetchTunnel = async () => {
       try {
-        const token = await kb?.config.getApiToken();
-        const url = await kb?.config.getServerUrl();
         const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`${url}/api/web/manage/tunnel`, { headers });
+        if (apiToken) headers['Authorization'] = `Bearer ${apiToken}`;
+        const res = await fetch(`${serverUrl}/api/web/manage/tunnel`, { headers });
         if (res.ok) {
           const data = await res.json();
           setTunnelUrl(data.url);
@@ -37,7 +38,7 @@ export default function SettingsView() {
     fetchTunnel();
     const timer = setInterval(fetchTunnel, 10_000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeAgent, serverUrl, apiToken]);
 
   const save = async (type: string, fn: () => Promise<void>) => {
     setSaving(true);
