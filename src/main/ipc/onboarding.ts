@@ -22,6 +22,7 @@ interface OnboardingData {
   timezone: string;
   claudeMode: 'subscription' | 'sdk';
   apiKey?: string;
+  openaiKey?: string;
   kybernesisKey?: string;
   ngrokToken?: string;
   telegramToken?: string;
@@ -33,7 +34,7 @@ interface OnboardingData {
 export function registerOnboardingHandlers(store: AppStore): void {
   ipcMain.handle(IPC.ONBOARD_CREATE, async (_event, data: OnboardingData) => {
     const { agentRoot, agentName, agentDescription, userName, userLocation, userAbout,
-            timezone, claudeMode, apiKey, kybernesisKey, ngrokToken,
+            timezone, claudeMode, apiKey, openaiKey, kybernesisKey, ngrokToken,
             telegramToken, whatsappEnabled, backupUrl, backupBranch } = data;
 
     // Create directories
@@ -105,6 +106,7 @@ export function registerOnboardingHandlers(store: AppStore): void {
     // Write .env
     const envLines = [];
     if (apiKey) envLines.push(`ANTHROPIC_API_KEY=${apiKey}`);
+    if (openaiKey) envLines.push(`OPENAI_API_KEY=${openaiKey}`);
     if (kybernesisKey) envLines.push(`KYBERNESIS_API_KEY=${kybernesisKey}`);
     if (ngrokToken) envLines.push(`NGROK_AUTHTOKEN=${ngrokToken}`);
     const token = `kb_${randomHex(32)}`;

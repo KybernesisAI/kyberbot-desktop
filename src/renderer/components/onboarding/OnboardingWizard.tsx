@@ -15,6 +15,7 @@ interface OnboardingData {
   about: string;
   claudeMode: 'subscription' | 'sdk';
   apiKey: string;
+  openaiKey: string;
   kybernesisKey: string;
   ngrokToken: string;
   telegramToken: string;
@@ -33,6 +34,7 @@ const INITIAL: OnboardingData = {
   about: '',
   claudeMode: 'subscription',
   apiKey: '',
+  openaiKey: '',
   kybernesisKey: '',
   ngrokToken: '',
   telegramToken: '',
@@ -78,6 +80,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
         timezone: data.timezone,
         claudeMode: data.claudeMode,
         apiKey: data.apiKey || undefined,
+        openaiKey: data.openaiKey || undefined,
         kybernesisKey: data.kybernesisKey || undefined,
         ngrokToken: data.ngrokToken || undefined,
         telegramToken: data.telegramToken || undefined,
@@ -185,6 +188,12 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                   <input type="password" value={data.apiKey} onChange={e => update({ apiKey: e.target.value })} style={S} placeholder="sk-ant-..." />
                 </div>
               )}
+
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                <label style={L}>OpenAI API Key</label>
+                <input type="password" value={data.openaiKey} onChange={e => update({ openaiKey: e.target.value })} style={S} placeholder="sk-proj-..." />
+                <p style={hint}>Required for semantic memory search (ChromaDB embeddings). Get one at <button onClick={() => kb?.prerequisites.openUrl('https://platform.openai.com/api-keys')} style={link}>platform.openai.com/api-keys</button></p>
+              </div>
             </div>
           )}
 
