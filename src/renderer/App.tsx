@@ -13,6 +13,7 @@ import ChannelsView from './components/channels/ChannelsView';
 import HeartbeatView from './components/heartbeat/HeartbeatView';
 import SettingsView from './components/settings/SettingsView';
 import BrainView from './components/brain/BrainView';
+import BusView from './components/bus/BusView';
 import OnboardingWizard from './components/onboarding/OnboardingWizard';
 
 function AppContent() {
@@ -72,6 +73,7 @@ function AppContent() {
         {activeTab === 'channels' && <ChannelsView />}
         {activeTab === 'heartbeat' && <HeartbeatView />}
         {activeTab === 'brain' && <BrainView />}
+        {activeTab === 'bus' && <BusView />}
         {activeTab === 'settings' && <SettingsView />}
       </div>
     </div>

@@ -1,27 +1,13 @@
 /**
  * Dashboard — service status cards, start/stop controls, persistent log viewer.
  * Phase 4F: Fleet overview section when in fleet mode.
- * Phase 5:  Agent Bus — message history + send form for inter-agent communication.
  */
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FleetStatusData } from '../../context/AppContext';
 import { getLogBuffer, subscribeToLogs } from '../../hooks/useLogs';
 import AnsiToHtml from 'ansi-to-html';
-
-// ── Agent Bus Types ──
-
-interface AgentMessage {
-  id: string;
-  from: string;
-  to: string; // agent name or '*' for broadcast
-  type: 'query' | 'notify' | 'delegate' | 'response';
-  topic?: string;
-  payload: string;
-  replyTo?: string;
-  timestamp: string;
-}
 
 
 const SERVICE_NAMES = ['ChromaDB', 'Server', 'Heartbeat', 'Sleep Agent', 'Channels', 'Tunnel'];
@@ -44,9 +30,9 @@ function statusDot(status: string): string {
   }
 }
 
-// ── Agent Bus Component ──
+// (Agent Bus moved to dedicated Bus tab)
 
-function AgentBus({ agents, activeAgent }: {
+function _removedAgentBusPlaceholder({ agents, activeAgent }: {
   agents: Array<{ name: string; status: string }>;
   activeAgent: string | null;
 }) {
@@ -507,13 +493,7 @@ export default function DashboardView() {
         />
       )}
 
-      {/* Agent Bus (only in fleet mode with 2+ agents) */}
-      {fleetMode && fleetStatus && fleetStatus.agents.length >= 2 && (
-        <AgentBus
-          agents={fleetStatus.agents}
-          activeAgent={activeAgent}
-        />
-      )}
+      {/* Agent Bus moved to dedicated Bus tab */}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
