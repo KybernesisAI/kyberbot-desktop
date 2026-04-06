@@ -351,8 +351,10 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent }: {
         </div>
       </div>
 
-      {/* Agent cards */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      {/* Agent cards — responsive columns based on count */}
+      <div className="grid gap-3 mb-4" style={{
+        gridTemplateColumns: `repeat(auto-fill, minmax(${fleetStatus.agents.length <= 4 ? '240px' : '180px'}, 1fr))`,
+      }}>
         {fleetStatus.agents.map((agent) => {
           const isActive = activeAgent?.toLowerCase() === agent.name.toLowerCase();
           return (
