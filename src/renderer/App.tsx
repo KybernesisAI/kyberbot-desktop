@@ -62,8 +62,12 @@ function AppContent() {
       <TitleBar />
       <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        {/* Chat stays mounted always so streaming isn't interrupted by tab switches */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: activeTab === 'chat' ? 'block' : 'none' }}>
+          <ChatView />
+        </div>
+        {/* Other tabs mount/unmount normally */}
         {activeTab === 'dashboard' && <DashboardView />}
-        {activeTab === 'chat' && <ChatView />}
         {activeTab === 'skills' && <SkillsView />}
         {activeTab === 'channels' && <ChannelsView />}
         {activeTab === 'heartbeat' && <HeartbeatView />}
