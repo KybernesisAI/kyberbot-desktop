@@ -1,11 +1,13 @@
 /**
  * Onboarding IPC handlers.
- * Creates the agent directory structure and initial files.
+ * Creates the agent directory structure, initial files, and scaffolds
+ * the CLAUDE.md via `kyberbot skill rebuild`.
  */
 
 import { ipcMain } from 'electron';
-import { mkdirSync, writeFileSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { execSync } from 'child_process';
 import * as yaml from 'js-yaml';
 import { IPC } from '../../types/ipc.js';
 import { AppStore } from '../store.js';
@@ -15,66 +17,138 @@ interface OnboardingData {
   agentName: string;
   agentDescription: string;
   userName: string;
+  userLocation: string;
+  userAbout: string;
   timezone: string;
   claudeMode: 'subscription' | 'sdk';
   apiKey?: string;
+  kybernesisKey?: string;
+  ngrokToken?: string;
+  telegramToken?: string;
+  whatsappEnabled?: boolean;
+  backupUrl?: string;
+  backupBranch?: string;
 }
 
 export function registerOnboardingHandlers(store: AppStore): void {
   ipcMain.handle(IPC.ONBOARD_CREATE, async (_event, data: OnboardingData) => {
-    const { agentRoot, agentName, agentDescription, userName, timezone, claudeMode, apiKey } = data;
+    const { agentRoot, agentName, agentDescription, userName, userLocation, userAbout,
+            timezone, claudeMode, apiKey, kybernesisKey, ngrokToken,
+            telegramToken, whatsappEnabled, backupUrl, backupBranch } = data;
 
     // Create directories
     const dirs = [
-      '',
-      'data',
-      'brain',
-      'skills',
-      'logs',
-      'scripts',
-      '.claude',
-      '.claude/agents',
-      '.claude/skills',
-      '.claude/skills/templates',
+      '', 'data', 'brain', 'skills', 'logs', 'scripts',
+      '.claude', '.claude/agents', '.claude/skills', '.claude/skills/templates',
     ];
     for (const dir of dirs) {
       const fullPath = join(agentRoot, dir);
       if (!existsSync(fullPath)) mkdirSync(fullPath, { recursive: true });
     }
 
-    // Write identity.yaml
-    const identity = {
+    // Build identity config
+    const identity: Record<string, unknown> = {
       agent_name: agentName,
       agent_description: agentDescription,
       timezone,
       heartbeat_interval: '30m',
       server: { port: 3456 },
-      claude: {
-        mode: claudeMode,
-        model: 'opus',
-      },
+      claude: { mode: claudeMode, model: 'opus' },
     };
+
+    // Optional: channels
+    if (telegramToken || whatsappEnabled) {
+      const channels: Record<string, unknown> = {};
+      if (telegramToken) channels.telegram = { bot_token: telegramToken };
+      if (whatsappEnabled) channels.whatsapp = { enabled: true };
+      identity.channels = channels;
+    }
+
+    // Optional: tunnel
+    if (ngrokToken) {
+      identity.tunnel = { enabled: true, provider: 'ngrok' };
+    }
+
+    // Optional: kybernesis
+    if (kybernesisKey) {
+      identity.kybernesis = { api_key: kybernesisKey };
+    }
+
+    // Optional: backup
+    if (backupUrl) {
+      identity.backup = {
+        enabled: true,
+        remote_url: backupUrl,
+        schedule: '24h',
+        branch: backupBranch || 'main',
+      };
+    }
+
     writeFileSync(join(agentRoot, 'identity.yaml'), yaml.dump(identity, { lineWidth: 120 }), 'utf-8');
 
     // Write SOUL.md
-    writeFileSync(join(agentRoot, 'SOUL.md'), `# ${agentName}\n\n${agentDescription}\n`, 'utf-8');
+    writeFileSync(join(agentRoot, 'SOUL.md'),
+      `# ${agentName}\n\n## Role\n${agentDescription}\n\n## Values\n- Be thorough and precise\n- Communicate clearly\n- Always verify before acting\n`, 'utf-8');
 
     // Write USER.md
-    writeFileSync(join(agentRoot, 'USER.md'), `# About the User\n\nName: ${userName}\nTimezone: ${timezone}\n`, 'utf-8');
+    const userLines = [`# About the User\n`];
+    if (userName) userLines.push(`Name: ${userName}`);
+    userLines.push(`Timezone: ${timezone}`);
+    if (userLocation) userLines.push(`Location: ${userLocation}`);
+    if (userAbout) userLines.push(`\n## About\n${userAbout}`);
+    writeFileSync(join(agentRoot, 'USER.md'), userLines.join('\n') + '\n', 'utf-8');
 
     // Write HEARTBEAT.md
-    writeFileSync(join(agentRoot, 'HEARTBEAT.md'), `# HEARTBEAT.md\n\n*My standing instructions. Every 30 minutes I check this file\nand act on whatever is most overdue.*\n\n---\n\n## Tasks\n\n<!-- Add tasks here -->\n`, 'utf-8');
+    writeFileSync(join(agentRoot, 'HEARTBEAT.md'),
+      `# HEARTBEAT.md\n\n*My standing instructions. Every 30 minutes I check this file\nand act on whatever is most overdue.*\n\n---\n\n## Tasks\n\n<!-- Add tasks here -->\n`, 'utf-8');
 
     // Write .env
     const envLines = [];
     if (apiKey) envLines.push(`ANTHROPIC_API_KEY=${apiKey}`);
-    envLines.push(`KYBERBOT_API_TOKEN=kb_${randomHex(32)}`);
+    if (kybernesisKey) envLines.push(`KYBERNESIS_API_KEY=${kybernesisKey}`);
+    if (ngrokToken) envLines.push(`NGROK_AUTHTOKEN=${ngrokToken}`);
+    const token = `kb_${randomHex(32)}`;
+    envLines.push(`KYBERBOT_API_TOKEN=${token}`);
     writeFileSync(join(agentRoot, '.env'), envLines.join('\n') + '\n', 'utf-8');
 
-    // Store the agent root
+    // Write .gitignore
+    writeFileSync(join(agentRoot, '.gitignore'),
+      `node_modules/\ndata/chromadb/\nlogs/\n*.log\n.env\n`, 'utf-8');
+
+    // Try to scaffold CLAUDE.md via kyberbot skill rebuild
+    try {
+      const home = process.env.HOME || '';
+      const nvmPaths: string[] = [];
+      try {
+        const nvmDir = join(home, '.nvm/versions/node');
+        const versions = require('fs').readdirSync(nvmDir) as string[];
+        versions.sort((a: string, b: string) => {
+          const va = a.replace('v', '').split('.').map(Number);
+          const vb = b.replace('v', '').split('.').map(Number);
+          for (let i = 0; i < 3; i++) { if ((vb[i] || 0) !== (va[i] || 0)) return (vb[i] || 0) - (va[i] || 0); }
+          return 0;
+        });
+        for (const v of versions) nvmPaths.push(join(nvmDir, v, 'bin'));
+      } catch {}
+      const fullPath = [...nvmPaths, join(home, '.local/bin'), '/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin',
+        ...(process.env.PATH || '').split(':')].join(':');
+
+      execSync('kyberbot skill rebuild', {
+        cwd: agentRoot,
+        env: { ...process.env, KYBERBOT_ROOT: agentRoot, PATH: fullPath },
+        timeout: 15_000,
+        stdio: 'pipe',
+      });
+    } catch {
+      // skill rebuild failed — write a minimal CLAUDE.md
+      writeFileSync(join(agentRoot, '.claude', 'CLAUDE.md'),
+        `# ${agentName} — Operational Manual\n\nAgent: ${agentName}\nRole: ${agentDescription}\n`, 'utf-8');
+    }
+
+    // Store the agent root and return the token so the app can use it immediately
     store.setAgentRoot(agentRoot);
 
-    return { ok: true, path: agentRoot };
+    return { ok: true, path: agentRoot, token };
   });
 }
 
