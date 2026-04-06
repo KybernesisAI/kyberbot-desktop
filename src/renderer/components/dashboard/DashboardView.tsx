@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FleetStatusData } from '../../context/AppContext';
-import { getLogBuffer, subscribeToLogs } from '../../hooks/useLogs';
+import { getLogBuffer, subscribeToLogs, setLogAgentRoot } from '../../hooks/useLogs';
 import AnsiToHtml from 'ansi-to-html';
 
 
@@ -445,9 +445,9 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent }: {
 }
 
 export default function DashboardView() {
-  const { health, effectiveStatus, fleetMode, fleetStatus, agents, activeAgent, setActiveAgent } = useApp();
+  const { health, effectiveStatus, fleetMode, fleetStatus, agents, activeAgent, setActiveAgent, agentRoot, runningAgentRoot } = useApp();
   const kb = (window as any).kyberbot;
-  const [logs, setLogs] = useState<string[]>(getLogBuffer());
+  const [logs, setLogs] = useState<string[]>([]);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   const isRunning = effectiveStatus === 'running';
@@ -457,12 +457,26 @@ export default function DashboardView() {
   const services = health?.services ?? SERVICE_NAMES.map(name => ({ name, status: isRunning ? 'unknown' : 'stopped' }));
   const ansiConverter = useMemo(() => new AnsiToHtml({ fg: '#a1a1aa', bg: 'transparent', newline: false, escapeXML: true }), []);
 
-  // Subscribe to log buffer updates (module-level, persists across tab switches)
+  // Tag incoming logs to the running agent's root
+  useEffect(() => {
+    setLogAgentRoot(runningAgentRoot);
+  }, [runningAgentRoot]);
+
+  // When switching agents, load that agent's log buffer
+  useEffect(() => {
+    setLogs([...getLogBuffer(agentRoot)]);
+  }, [agentRoot]);
+
+  // Subscribe to log buffer updates
   useEffect(() => {
     return subscribeToLogs((lines) => {
-      setLogs([...lines]);
+      // Only update if these logs are for the agent we're viewing
+      const buffer = getLogBuffer(agentRoot);
+      if (lines === buffer) {
+        setLogs([...lines]);
+      }
     });
-  }, []);
+  }, [agentRoot]);
 
   // Auto-scroll only the log container
   useEffect(() => {
