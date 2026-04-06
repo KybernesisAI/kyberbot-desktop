@@ -57,7 +57,7 @@ export default function MemoryBlocks() {
     for (const [name, data] of results) newBlocks[name as BlockName] = data;
     setBlocks(newBlocks);
     setLoading(false);
-  }, [serverUrl, headers]);
+  }, [serverUrl, headers, serverReady]);
 
   useEffect(() => { fetchBlocks(); }, [fetchBlocks]);
 
