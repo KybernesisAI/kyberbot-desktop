@@ -484,32 +484,15 @@ export default function DashboardView() {
 
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflowY: "auto", padding: 16, background: "var(--bg-primary)" }}>
-      {/* Fleet Controls — visible when 2+ agents registered but fleet not running */}
-      {agents.length >= 2 && !fleetStatus && !isRunning && !isStarting && (
+      {/* Fleet mode info — visible when 2+ agents registered but not running */}
+      {agents.length >= 2 && !isRunning && !isStarting && (
         <div className="mb-4 p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-          <div className="flex items-center justify-between">
-            <span style={{
-              fontFamily: 'var(--font-mono)', fontSize: '11px',
-              color: 'var(--fg-secondary)',
-            }}>
-              {agents.length} agents registered — fleet mode available
-            </span>
-            <button
-              onClick={async () => {
-                await kb?.fleet.start(agents.map((a: any) => a.name));
-              }}
-              className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                borderColor: 'var(--accent-emerald)',
-                color: 'var(--accent-emerald)',
-                background: 'transparent',
-                cursor: 'pointer',
-              }}
-            >
-              Start Fleet
-            </button>
-          </div>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: '11px',
+            color: 'var(--fg-secondary)',
+          }}>
+            {agents.length} agents registered — use Start to launch fleet
+          </span>
         </div>
       )}
 
@@ -543,15 +526,10 @@ export default function DashboardView() {
           }}>
             {cliStatus}
           </span>
+          {/* Start single agent */}
           <button
             onClick={async () => {
-              if (agents.length >= 2) {
-                // Fleet mode: start all registered agents
-                await kb?.fleet.start(agents.map((a: any) => a.name));
-              } else {
-                // Single agent mode
-                await kb?.services.start();
-              }
+              await kb?.services.start();
             }}
             disabled={isRunning || isStarting || isStopping}
             className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
@@ -564,8 +542,28 @@ export default function DashboardView() {
               opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
             }}
           >
-            {agents.length >= 2 ? 'Start Fleet' : 'Start'}
+            Start
           </button>
+          {/* Start fleet (only when 2+ agents registered) */}
+          {agents.length >= 2 && (
+            <button
+              onClick={async () => {
+                await kb?.fleet.start(agents.map((a: any) => a.name));
+              }}
+              disabled={isRunning || isStarting || isStopping}
+              className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                borderColor: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-cyan)',
+                color: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-cyan)',
+                background: 'transparent',
+                cursor: isRunning || isStarting || isStopping ? 'default' : 'pointer',
+                opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
+              }}
+            >
+              Start Fleet
+            </button>
+          )}
           <button
             onClick={async () => {
               if (fleetMode && fleetStatus) {
