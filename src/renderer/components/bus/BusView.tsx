@@ -23,6 +23,7 @@ export default function BusView() {
   const [recipient, setRecipient] = useState<string>('broadcast');
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
+  const [pendingTo, setPendingTo] = useState<string | null>(null); // who we're waiting on
   const [filterAgent, setFilterAgent] = useState<string | null>(null);
   const [filterTopic, setFilterTopic] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -59,20 +60,22 @@ export default function BusView() {
   const handleSend = async () => {
     if (!messageText.trim() || !activeAgent) return;
     setSending(true);
+    setPendingTo(recipient === 'broadcast' ? 'all agents' : recipient);
+    const sentText = messageText.trim();
+    setMessageText('');
     try {
       const isBroadcast = recipient === 'broadcast';
       const endpoint = isBroadcast
         ? `${baseServerUrl}/fleet/bus/broadcast`
         : `${baseServerUrl}/fleet/bus/send`;
       const body = isBroadcast
-        ? { from: activeAgent, message: messageText.trim() }
-        : { from: activeAgent, to: recipient, message: messageText.trim() };
+        ? { from: activeAgent, message: sentText }
+        : { from: activeAgent, to: recipient, message: sentText };
 
       await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
-      setMessageText('');
       await fetchHistory();
     } catch { /* failed */ }
-    finally { setSending(false); }
+    finally { setSending(false); setPendingTo(null); }
   };
 
   // Extract unique topics and agent names from messages
@@ -350,6 +353,15 @@ export default function BusView() {
                 </div>
               );
             })
+          )}
+          {/* Pending response indicator */}
+          {sending && pendingTo && (
+            <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--bg-elevated)', borderLeft: '2px solid var(--fg-muted)' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ animation: 'pulse 1.5s infinite', display: 'inline-block', width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--accent-cyan)' }} />
+                Waiting for {pendingTo} to respond...
+              </div>
+            </div>
           )}
           <div ref={messagesEndRef} />
         </div>
