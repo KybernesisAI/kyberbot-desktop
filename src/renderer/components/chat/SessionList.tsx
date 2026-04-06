@@ -35,11 +35,12 @@ interface SessionListProps {
 }
 
 export default function SessionList({ currentSessionId, onSelectSession, onNewSession }: SessionListProps) {
-  const { serverUrl, apiToken } = useApp();
+  const { serverUrl, apiToken, serverReady } = useApp();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchSessions = useCallback(async () => {
+    if (!serverReady) return; // Wait for server to be confirmed up
     try {
       const headers: Record<string, string> = {};
       if (apiToken) headers['Authorization'] = `Bearer ${apiToken}`;

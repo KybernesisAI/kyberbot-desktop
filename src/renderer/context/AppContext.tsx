@@ -1,5 +1,7 @@
 /**
- * App-wide context: API token, server URL, health state, agent root, logs.
+ * App-wide context: API token, server URL, health state, agent root.
+ * Delays API readiness until the first successful health update
+ * to avoid race condition errors in the server log.
  */
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
@@ -11,7 +13,8 @@ interface AppContextValue {
   serverUrl: string;
   health: HealthData | null;
   cliStatus: string;
-  isReady: boolean;
+  isReady: boolean;       // config loaded (agent root, token)
+  serverReady: boolean;   // server is up and responding to health checks
 }
 
 const AppContext = createContext<AppContextValue>({
@@ -21,6 +24,7 @@ const AppContext = createContext<AppContextValue>({
   health: null,
   cliStatus: 'stopped',
   isReady: false,
+  serverReady: false,
 });
 
 export function useApp(): AppContextValue {
@@ -34,12 +38,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [cliStatus, setCliStatus] = useState('stopped');
   const [isReady, setIsReady] = useState(false);
+  const [serverReady, setServerReady] = useState(false);
 
   useEffect(() => {
     const kb = (window as any).kyberbot;
     if (!kb) return;
 
-    // Load config on mount
     const init = async () => {
       const root = await kb.config.getAgentRoot();
       setAgentRoot(root);
@@ -53,25 +57,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setServerUrl(url);
       }
 
-      const { status, health: h } = await kb.services.getStatus();
+      // Just get lifecycle status — don't make any HTTP calls yet
+      const { status } = await kb.services.getStatus();
       setCliStatus(status);
-      if (h) setHealth(h);
       setIsReady(true);
     };
     init();
 
-    // Subscribe to health updates
+    // Subscribe to health updates — first successful one marks server as ready
     const unsubHealth = kb.services.onHealthUpdate((h: HealthData) => {
       setHealth(h);
-      if (h.status !== 'offline') setCliStatus('running');
-      else setCliStatus('stopped');
+      if (h.status !== 'offline') {
+        setCliStatus('running');
+        // Re-read token on first health update in case it wasn't available before
+        if (!serverReady) {
+          kb.config.getApiToken().then((token: string | null) => {
+            if (token) setApiToken(token);
+            setServerReady(true);
+          });
+        }
+      } else {
+        setCliStatus('stopped');
+        setServerReady(false);
+      }
     });
 
-    // Subscribe to status changes (start/stop/crash)
     const unsubStatus = kb.services.onStatusChange((status: string) => {
       setCliStatus(status);
       if (status === 'stopped' || status === 'crashed') {
         setHealth(null);
+        setServerReady(false);
       }
     });
 
@@ -82,7 +97,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AppContext.Provider value={{ agentRoot, apiToken, serverUrl, health, cliStatus, isReady }}>
+    <AppContext.Provider value={{ agentRoot, apiToken, serverUrl, health, cliStatus, isReady, serverReady }}>
       {children}
     </AppContext.Provider>
   );

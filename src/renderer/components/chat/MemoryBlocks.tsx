@@ -22,7 +22,7 @@ const BLOCK_META: Record<BlockName, { label: string; description: string; color:
 };
 
 export default function MemoryBlocks() {
-  const { serverUrl, apiToken } = useApp();
+  const { serverUrl, apiToken, serverReady } = useApp();
   const [blocks, setBlocks] = useState<Record<BlockName, BlockData>>({
     soul: { content: '', lastModified: '' },
     user: { content: '', lastModified: '' },
@@ -39,6 +39,7 @@ export default function MemoryBlocks() {
   }, [apiToken]);
 
   const fetchBlocks = useCallback(async () => {
+    if (!serverReady) return;
     setLoading(true);
     const results = await Promise.all(
       BLOCKS.map(async (name) => {
