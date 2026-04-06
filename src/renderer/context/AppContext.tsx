@@ -83,14 +83,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [serverReady, setServerReady] = useState(false);
 
   // Fleet state
-  const [fleetMode, setFleetMode] = useState(false);
   const [agents, setAgents] = useState<FleetAgentInfo[]>([]);
   const [activeAgent, setActiveAgentState] = useState<string | null>(null);
   const [fleetStatus, setFleetStatus] = useState<FleetStatusData | null>(null);
 
-  // Compute effective serverUrl based on fleet mode
-  // Only route through /agent/{name} when fleet server is actually running (fleetStatus !== null)
-  const serverUrl = fleetMode && activeAgent && fleetStatus
+  // Fleet mode is derived — true only when fleet server is confirmed running
+  const fleetMode = fleetStatus !== null;
+
+  // Compute effective serverUrl — only route through /agent/{name} when fleet is running
+  const serverUrl = fleetMode && activeAgent
     ? `${baseServerUrl}/agent/${encodeURIComponent(activeAgent)}`
     : baseServerUrl;
 
@@ -130,11 +131,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setBaseServerUrl(url);
       }
 
-      // Check fleet status to detect fleet mode
+      // Check fleet status — if fleet server is running, set fleetStatus (which derives fleetMode)
       try {
         const fleetResult = await kb.fleet.getStatus();
         if (fleetResult.fleetMode && fleetResult.fleet) {
-          setFleetMode(true);
           setFleetStatus(fleetResult.fleet);
         }
       } catch {
@@ -194,7 +194,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Subscribe to fleet status updates
     const unsubFleet = kb.fleet?.onStatusUpdate?.((fleet: FleetStatusData) => {
       setFleetStatus(fleet);
-      setFleetMode(true);
 
       // Update agent running states from fleet data
       setAgents(prev => prev.map(agent => {
