@@ -65,6 +65,12 @@ export class LifecycleManager extends EventEmitter {
 
   // ── Public API ──
 
+  /** Get the process state for the currently viewed agent */
+  private getAgentState(): AgentProcess | undefined {
+    const root = this.store.getAgentRoot();
+    return root ? this.agents.get(root) : undefined;
+  }
+
   /** Status of the currently viewed agent (from store.agentRoot) */
   get status(): CliStatus {
     if (this._fleetMode) {
