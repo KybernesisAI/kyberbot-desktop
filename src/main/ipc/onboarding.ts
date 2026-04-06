@@ -7,6 +7,7 @@
 import { ipcMain } from 'electron';
 import { mkdirSync, writeFileSync, existsSync, readFileSync, copyFileSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { homedir } from 'os';
 import { execSync } from 'child_process';
 import * as yaml from 'js-yaml';
 import { IPC } from '../../types/ipc.js';
@@ -187,6 +188,37 @@ export function registerOnboardingHandlers(store: AppStore): void {
       // skill rebuild failed — write a minimal CLAUDE.md
       writeFileSync(join(agentRoot, '.claude', 'CLAUDE.md'),
         `# ${agentName} — Operational Manual\n\nAgent: ${agentName}\nRole: ${agentDescription}\n`, 'utf-8');
+    }
+
+    // Auto-register in ~/.kyberbot/registry.yaml
+    try {
+      const registryDir = join(homedir(), '.kyberbot');
+      const registryPath = join(registryDir, 'registry.yaml');
+
+      interface RegistryData {
+        agents: Record<string, { root: string; registered: string }>;
+        defaults?: { auto_start?: string[] };
+      }
+
+      let registry: RegistryData = { agents: {} };
+      try {
+        const raw = readFileSync(registryPath, 'utf-8');
+        const parsed = yaml.load(raw) as RegistryData | null;
+        if (parsed?.agents) registry = parsed;
+      } catch {
+        // No existing registry — will create
+      }
+
+      if (!existsSync(registryDir)) mkdirSync(registryDir, { recursive: true });
+
+      registry.agents[agentName.toLowerCase()] = {
+        root: agentRoot,
+        registered: new Date().toISOString(),
+      };
+
+      writeFileSync(registryPath, yaml.dump(registry, { lineWidth: 120 }), 'utf-8');
+    } catch {
+      // Registry write failed — non-fatal
     }
 
     // Store the agent root and return the token so the app can use it immediately

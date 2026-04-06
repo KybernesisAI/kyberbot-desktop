@@ -76,6 +76,15 @@ const api = {
       apiKey?: string;
     }): Promise<{ ok: boolean; path: string }> => ipcRenderer.invoke(IPC.ONBOARD_CREATE, data),
   },
+
+  fleet: {
+    list: (): Promise<Array<{ name: string; root: string; port: number; description: string; registered: string; running: boolean }>> =>
+      ipcRenderer.invoke('fleet:list'),
+    register: (rootPath: string): Promise<{ ok: boolean; name: string }> =>
+      ipcRenderer.invoke('fleet:register', rootPath),
+    unregister: (name: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('fleet:unregister', name),
+  },
 };
 
 contextBridge.exposeInMainWorld('kyberbot', api);
