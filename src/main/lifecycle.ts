@@ -77,6 +77,10 @@ export class LifecycleManager extends EventEmitter {
     return this._status === 'running' || this._status === 'starting';
   }
 
+  getAgentRoot(): string | null {
+    return this.store.getAgentRoot();
+  }
+
   getRecentLogs(): string[] {
     return [...this.stdoutBuffer];
   }

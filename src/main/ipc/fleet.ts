@@ -97,10 +97,25 @@ export function registerFleetHandlers(
     const registry = readRegistry();
     const results: AgentInfo[] = [];
 
+    // Get current lifecycle state to determine what's actually running
+    const isFleetMode = lifecycle?.fleetMode ?? false;
+    const lifecycleRunning = lifecycle?.isRunning() ?? false;
+    const currentAgentRoot = lifecycle?.getAgentRoot?.() ?? null;
+
     const entries = Object.entries(registry.agents);
-    const probes = entries.map(async ([name, entry]) => {
+    for (const [name, entry] of entries) {
       const identity = readIdentityFromRoot(entry.root);
-      const running = await probeHealth(identity.port);
+
+      let running = false;
+      if (isFleetMode && lifecycleRunning) {
+        // Fleet mode: all agents managed by fleet are running — probe to confirm
+        running = await probeHealth(identity.port);
+      } else if (lifecycleRunning && currentAgentRoot === entry.root) {
+        // Single-agent mode: only the current agent root is running
+        running = true;
+      }
+      // Otherwise: agent is not running (don't health-probe other agents on same port)
+
       results.push({
         name: identity.agent_name,
         root: entry.root,
@@ -109,9 +124,8 @@ export function registerFleetHandlers(
         registered: entry.registered,
         running,
       });
-    });
+    }
 
-    await Promise.all(probes);
     return results;
   });
 
