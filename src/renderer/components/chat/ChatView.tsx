@@ -43,7 +43,7 @@ function getToolMeta(name: string) {
 }
 
 export default function ChatView() {
-  const { serverUrl, apiToken } = useApp();
+  const { serverUrl, apiToken, serverReady } = useApp();
   const [agentName, setAgentName] = useState('Atlas');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -56,6 +56,12 @@ export default function ChatView() {
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const authHeaders = useCallback((): Record<string, string> => {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (apiToken) h['Authorization'] = `Bearer ${apiToken}`;
+    return h;
+  }, [apiToken]);
+
   // Load agent name and model from identity
   useEffect(() => {
     const kb = (window as any).kyberbot;
@@ -66,12 +72,53 @@ export default function ChatView() {
     });
   }, []);
 
+  // Load most recent session on mount (like web app)
+  useEffect(() => {
+    if (!serverReady) return;
+    const loadMostRecent = async () => {
+      try {
+        const res = await fetch(`${serverUrl}/api/web/sessions`, { headers: authHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const sessions = (data.sessions || []).filter((s: any) => s.message_count > 0);
+        if (sessions.length > 0) {
+          await loadSession(sessions[0].id);
+        }
+      } catch {}
+    };
+    loadMostRecent();
+  }, [serverReady]);
+
+  // Save a message to the current session
+  const saveMessage = useCallback(async (sid: string, role: string, content: string, extra?: { toolCalls?: ToolCall[]; memoryUpdates?: string[] }) => {
+    try {
+      await fetch(`${serverUrl}/api/web/sessions/${sid}/messages`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ role, content, toolCalls: extra?.toolCalls, memoryUpdates: extra?.memoryUpdates }),
+      });
+    } catch {}
+  }, [serverUrl, authHeaders]);
+
+  // Create a new session on the server
+  const createSession = useCallback(async (): Promise<string | null> => {
+    try {
+      const res = await fetch(`${serverUrl}/api/web/sessions`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.sessionId;
+      }
+    } catch {}
+    return null;
+  }, [serverUrl, authHeaders]);
+
   // Load session messages
   const loadSession = useCallback(async (id: string) => {
     try {
-      const headers: Record<string, string> = {};
-      if (apiToken) headers['Authorization'] = `Bearer ${apiToken}`;
-      const res = await fetch(`${serverUrl}/api/web/sessions/${id}/messages`, { headers });
+      const res = await fetch(`${serverUrl}/api/web/sessions/${id}/messages`, { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
         const msgs: Message[] = (data.messages || []).map((m: any) => ({
@@ -84,7 +131,7 @@ export default function ChatView() {
         setSessionId(id);
       }
     } catch {}
-  }, [serverUrl, apiToken]);
+  }, [serverUrl, authHeaders]);
 
   const startNewSession = useCallback(() => {
     setMessages([]);
@@ -107,17 +154,26 @@ export default function ChatView() {
     setStreamStatus('thinking');
     setStreamTools([]);
 
+    // Create session if none exists
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      currentSessionId = await createSession() || undefined;
+      if (currentSessionId) setSessionId(currentSessionId);
+    }
+
+    // Save user message to session
+    if (currentSessionId) {
+      saveMessage(currentSessionId, 'user', prompt);
+    }
+
     const controller = new AbortController();
     abortRef.current = controller;
-
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (apiToken) headers['Authorization'] = `Bearer ${apiToken}`;
 
     try {
       const res = await fetch(`${serverUrl}/api/web/chat`, {
         method: 'POST',
-        headers,
-        body: JSON.stringify({ prompt }),
+        headers: authHeaders(),
+        body: JSON.stringify({ prompt, sessionId: currentSessionId }),
         signal: controller.signal,
       });
 
@@ -190,12 +246,21 @@ export default function ChatView() {
         }
       }
 
-      setMessages(prev => [...prev, {
-        role: 'assistant',
+      const assistantMsg = {
+        role: 'assistant' as const,
         content: fullText,
         toolCalls: tools.length > 0 ? [...tools] : undefined,
         memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
-      }]);
+      };
+      setMessages(prev => [...prev, assistantMsg]);
+
+      // Save assistant message to session
+      if (currentSessionId) {
+        saveMessage(currentSessionId, 'assistant', fullText, {
+          toolCalls: assistantMsg.toolCalls,
+          memoryUpdates: assistantMsg.memoryUpdates,
+        });
+      }
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${(err as Error).message}` }]);
