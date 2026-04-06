@@ -16,8 +16,15 @@ body {
   background: var(--bg-primary);
   color: var(--fg-primary);
   /* Text selection enabled everywhere except the title bar drag region */
-  user-select: text;
-  -webkit-user-select: text;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text;
+}
+
+/* Override Tailwind preflight which sets user-select: none */
+*, ::before, ::after {
+  user-select: inherit;
+  -webkit-user-select: inherit;
 }
 
 .section-title {
