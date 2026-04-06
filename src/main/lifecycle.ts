@@ -47,6 +47,7 @@ export class LifecycleManager extends EventEmitter {
   private attached = false; // true if we attached to an external server (don't kill on quit)
   private _fleetMode = false;
   private _fleetAgents: string[] = [];
+  private _runningAgentRoot: string | null = null;
 
   constructor(store: AppStore) {
     super();
@@ -81,6 +82,11 @@ export class LifecycleManager extends EventEmitter {
     return this.store.getAgentRoot();
   }
 
+  /** Which agent root is the running process actually serving? */
+  getRunningAgentRoot(): string | null {
+    return this._runningAgentRoot;
+  }
+
   getRecentLogs(): string[] {
     return [...this.stdoutBuffer];
   }
@@ -92,6 +98,7 @@ export class LifecycleManager extends EventEmitter {
 
     this._fleetMode = true;
     this._fleetAgents = agents;
+    this._runningAgentRoot = '__fleet__';
 
     // Check if a fleet server is already running on the expected port
     try {
@@ -152,6 +159,7 @@ export class LifecycleManager extends EventEmitter {
     this.logStream = null;
     this._status = 'stopped';
     this._fleetMode = false;
+    this._runningAgentRoot = null;
     this.lastFleetStatus = null;
     this.emit('status-change', this._status);
   }
@@ -244,6 +252,9 @@ export class LifecycleManager extends EventEmitter {
 
     if (this.process) return;
 
+    // Record which agent we're starting
+    this._runningAgentRoot = this.store.getAgentRoot();
+
     // Check if a server is already running on the expected port
     try {
       const port = this.getServerPort();
@@ -305,6 +316,7 @@ export class LifecycleManager extends EventEmitter {
     this.logStream?.end();
     this.logStream = null;
     this._status = 'stopped';
+    this._runningAgentRoot = null;
     this.emit('status-change', this._status);
   }
 

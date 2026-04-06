@@ -26,6 +26,7 @@ export function registerServiceHandlers(
     return {
       status: lifecycle.status,
       health: lifecycle.getHealth(),
+      runningAgentRoot: lifecycle.getRunningAgentRoot(),
     };
   });
 
@@ -33,7 +34,7 @@ export function registerServiceHandlers(
   lifecycle.on('status-change', (status: string) => {
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {
-      win.webContents.send('services:status-change', status);
+      win.webContents.send('services:status-change', status, lifecycle.getRunningAgentRoot());
     }
   });
 }

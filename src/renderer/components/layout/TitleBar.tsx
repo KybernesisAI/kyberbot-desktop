@@ -10,7 +10,7 @@ import { useApp } from '../../context/AppContext';
 import type { FleetAgentInfo } from '../../context/AppContext';
 
 export default function TitleBar() {
-  const { agentRoot, fleetMode, agents: contextAgents, activeAgent, setActiveAgent } = useApp();
+  const { agentRoot, fleetMode, agents: contextAgents, activeAgent, setActiveAgent, runningAgentRoot } = useApp();
   const [agentName, setAgentName] = useState('KyberBot');
   const [isDark, setIsDark] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
@@ -73,17 +73,10 @@ export default function TitleBar() {
   };
 
   const switchToAgent = async (agent: FleetAgentInfo) => {
-    if (fleetMode) {
-      // Fleet mode: instant switch via context, no reload
-      setActiveAgent(agent.name);
-      setAgentName(agent.name);
-      setShowMenu(false);
-    } else {
-      // Single-agent mode: set root + reload (legacy behavior)
-      const kb = (window as any).kyberbot;
-      await kb.config.setAgentRoot(agent.root);
-      window.location.reload();
-    }
+    // Always switch via context — no page reload needed
+    setActiveAgent(agent.name);
+    setAgentName(agent.name);
+    setShowMenu(false);
   };
 
   const browseAgent = async () => {
@@ -188,7 +181,11 @@ export default function TitleBar() {
               >
                 <Circle
                   size={6}
-                  fill={agent.running ? '#10b981' : '#6b7280'}
+                  fill={
+                    fleetMode
+                      ? (agent.running ? '#10b981' : '#6b7280')
+                      : (runningAgentRoot === agent.root ? '#10b981' : '#6b7280')
+                  }
                   stroke="none"
                   style={{ flexShrink: 0 }}
                 />

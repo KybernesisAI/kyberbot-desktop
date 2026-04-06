@@ -445,14 +445,14 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent }: {
 }
 
 export default function DashboardView() {
-  const { health, cliStatus, fleetMode, fleetStatus, agents, activeAgent, setActiveAgent } = useApp();
+  const { health, effectiveStatus, fleetMode, fleetStatus, agents, activeAgent, setActiveAgent } = useApp();
   const kb = (window as any).kyberbot;
   const [logs, setLogs] = useState<string[]>(getLogBuffer());
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  const isRunning = cliStatus === 'running';
-  const isStopping = cliStatus === 'stopping';
-  const isStarting = cliStatus === 'starting';
+  const isRunning = effectiveStatus === 'running';
+  const isStopping = effectiveStatus === 'stopping';
+  const isStarting = effectiveStatus === 'starting';
 
   const services = health?.services ?? SERVICE_NAMES.map(name => ({ name, status: isRunning ? 'unknown' : 'stopped' }));
   const ansiConverter = useMemo(() => new AnsiToHtml({ fg: '#a1a1aa', bg: 'transparent', newline: false, escapeXML: true }), []);
@@ -525,7 +525,7 @@ export default function DashboardView() {
             fontFamily: 'var(--font-mono)',
             color: isRunning ? 'var(--status-success)' : isStopping ? 'var(--status-warning)' : isStarting ? 'var(--status-warning)' : 'var(--fg-muted)',
           }}>
-            {cliStatus}
+            {effectiveStatus}
           </span>
           {/* Start current agent only */}
           <button
