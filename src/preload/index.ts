@@ -84,6 +84,21 @@ const api = {
       ipcRenderer.invoke('fleet:register', rootPath),
     unregister: (name: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('fleet:unregister', name),
+    start: (agents: string[]): Promise<{ ok: boolean; status: string }> =>
+      ipcRenderer.invoke('fleet:start', agents),
+    stop: (): Promise<{ ok: boolean; status: string }> =>
+      ipcRenderer.invoke('fleet:stop'),
+    getStatus: (): Promise<{ status: string; fleetMode: boolean; fleet: any; health: any }> =>
+      ipcRenderer.invoke('fleet:get-status'),
+    addAgent: (name: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('fleet:add-agent', name),
+    removeAgent: (name: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('fleet:remove-agent', name),
+    onStatusUpdate: (callback: (fleet: any) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, fleet: any) => callback(fleet);
+      ipcRenderer.on('fleet:status-update', handler);
+      return () => ipcRenderer.removeListener('fleet:status-update', handler);
+    },
   },
 };
 

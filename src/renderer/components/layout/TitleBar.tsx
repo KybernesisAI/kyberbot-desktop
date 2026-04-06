@@ -7,22 +7,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Moon, Sun, ChevronDown, FolderOpen, Plus, Circle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-
-interface FleetAgent {
-  name: string;
-  root: string;
-  port: number;
-  description: string;
-  registered: string;
-  running: boolean;
-}
+import type { FleetAgentInfo } from '../../context/AppContext';
 
 export default function TitleBar() {
-  const { agentRoot } = useApp();
+  const { agentRoot, fleetMode, agents: contextAgents, activeAgent, setActiveAgent } = useApp();
   const [agentName, setAgentName] = useState('KyberBot');
   const [isDark, setIsDark] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
-  const [fleetAgents, setFleetAgents] = useState<FleetAgent[]>([]);
+  const [fleetAgents, setFleetAgents] = useState<FleetAgentInfo[]>([]);
   const [loadingFleet, setLoadingFleet] = useState(false);
 
   useEffect(() => {
@@ -33,6 +25,20 @@ export default function TitleBar() {
     });
     setIsDark(!document.documentElement.classList.contains('light'));
   }, [agentRoot]);
+
+  // Keep fleetAgents in sync with context agents
+  useEffect(() => {
+    if (contextAgents.length > 0) {
+      setFleetAgents(contextAgents);
+    }
+  }, [contextAgents]);
+
+  // Update displayed name when active agent changes in fleet mode
+  useEffect(() => {
+    if (fleetMode && activeAgent) {
+      setAgentName(activeAgent);
+    }
+  }, [fleetMode, activeAgent]);
 
   const loadFleet = useCallback(async () => {
     const kb = (window as any).kyberbot;
@@ -66,10 +72,18 @@ export default function TitleBar() {
     }
   };
 
-  const switchToAgent = async (agent: FleetAgent) => {
-    const kb = (window as any).kyberbot;
-    await kb.config.setAgentRoot(agent.root);
-    window.location.reload();
+  const switchToAgent = async (agent: FleetAgentInfo) => {
+    if (fleetMode) {
+      // Fleet mode: instant switch via context, no reload
+      setActiveAgent(agent.name);
+      setAgentName(agent.name);
+      setShowMenu(false);
+    } else {
+      // Single-agent mode: set root + reload (legacy behavior)
+      const kb = (window as any).kyberbot;
+      await kb.config.setAgentRoot(agent.root);
+      window.location.reload();
+    }
   };
 
   const browseAgent = async () => {
@@ -180,8 +194,10 @@ export default function TitleBar() {
                 />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', overflow: 'hidden' }}>
                   <span style={{
-                    color: agent.root === agentRoot ? 'var(--accent-emerald)' : 'var(--fg-secondary)',
-                    fontWeight: agent.root === agentRoot ? 600 : 400,
+                    color: (fleetMode ? agent.name === activeAgent : agent.root === agentRoot)
+                      ? 'var(--accent-emerald)' : 'var(--fg-secondary)',
+                    fontWeight: (fleetMode ? agent.name === activeAgent : agent.root === agentRoot)
+                      ? 600 : 400,
                   }}>
                     {agent.name}
                   </span>

@@ -2,10 +2,38 @@
  * App-wide context: API token, server URL, health state, agent root.
  * Delays API readiness until the first successful health update
  * to avoid race condition errors in the server log.
+ *
+ * Phase 4D: Multi-agent fleet state. When fleetMode is true, serverUrl
+ * routes through /agent/{activeAgent} and switching agents is instant
+ * (no page reload).
  */
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { HealthData } from '../../types/ipc';
+
+export interface FleetAgentInfo {
+  name: string;
+  root: string;
+  port: number;
+  description: string;
+  registered: string;
+  running: boolean;
+}
+
+export interface FleetStatusData {
+  mode: 'fleet';
+  agents: Array<{
+    name: string;
+    status: string;
+    uptime?: string;
+    services?: Array<{ name: string; status: string }>;
+    channels?: Array<{ name: string; connected: boolean }>;
+    pid?: number;
+  }>;
+  sleep?: { current_agent: string | null; last_run: string | null };
+  uptime: string;
+  pid: number;
+}
 
 interface AppContextValue {
   agentRoot: string | null;
@@ -15,6 +43,13 @@ interface AppContextValue {
   cliStatus: string;
   isReady: boolean;       // config loaded (agent root, token)
   serverReady: boolean;   // server is up and responding to health checks
+
+  // Fleet state
+  fleetMode: boolean;
+  agents: FleetAgentInfo[];
+  activeAgent: string | null;
+  setActiveAgent: (name: string) => void;
+  fleetStatus: FleetStatusData | null;
 }
 
 const AppContext = createContext<AppContextValue>({
@@ -25,6 +60,11 @@ const AppContext = createContext<AppContextValue>({
   cliStatus: 'stopped',
   isReady: false,
   serverReady: false,
+  fleetMode: false,
+  agents: [],
+  activeAgent: null,
+  setActiveAgent: () => {},
+  fleetStatus: null,
 });
 
 export function useApp(): AppContextValue {
@@ -34,11 +74,41 @@ export function useApp(): AppContextValue {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [agentRoot, setAgentRoot] = useState<string | null>(null);
   const [apiToken, setApiToken] = useState<string | null>(null);
-  const [serverUrl, setServerUrl] = useState('http://localhost:3456');
+  const [baseServerUrl, setBaseServerUrl] = useState('http://localhost:3456');
   const [health, setHealth] = useState<HealthData | null>(null);
   const [cliStatus, setCliStatus] = useState('stopped');
   const [isReady, setIsReady] = useState(false);
   const [serverReady, setServerReady] = useState(false);
+
+  // Fleet state
+  const [fleetMode, setFleetMode] = useState(false);
+  const [agents, setAgents] = useState<FleetAgentInfo[]>([]);
+  const [activeAgent, setActiveAgentState] = useState<string | null>(null);
+  const [fleetStatus, setFleetStatus] = useState<FleetStatusData | null>(null);
+
+  // Compute effective serverUrl based on fleet mode
+  const serverUrl = fleetMode && activeAgent
+    ? `${baseServerUrl}/agent/${encodeURIComponent(activeAgent)}`
+    : baseServerUrl;
+
+  const setActiveAgent = useCallback((name: string) => {
+    setActiveAgentState(name);
+
+    // Find the agent's root and read its token
+    const kb = (window as any).kyberbot;
+    if (!kb) return;
+
+    const agent = agents.find(a => a.name.toLowerCase() === name.toLowerCase());
+    if (agent) {
+      // In fleet mode, update the agent root so config reads the right .env
+      kb.config.setAgentRoot(agent.root).then(() => {
+        setAgentRoot(agent.root);
+        kb.config.getApiToken().then((token: string | null) => {
+          if (token) setApiToken(token);
+        });
+      });
+    }
+  }, [agents]);
 
   useEffect(() => {
     const kb = (window as any).kyberbot;
@@ -54,7 +124,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
           kb.config.getServerUrl(),
         ]);
         setApiToken(token);
-        setServerUrl(url);
+        setBaseServerUrl(url);
+      }
+
+      // Check fleet status to detect fleet mode
+      try {
+        const fleetResult = await kb.fleet.getStatus();
+        if (fleetResult.fleetMode && fleetResult.fleet) {
+          setFleetMode(true);
+          setFleetStatus(fleetResult.fleet);
+        }
+      } catch {
+        // Fleet not available, stay in single-agent mode
+      }
+
+      // Load registered agents to detect multi-agent setup
+      try {
+        const registeredAgents = await kb.fleet.list();
+        setAgents(registeredAgents);
+
+        // If 2+ agents registered and no active agent set, default to current
+        if (registeredAgents.length >= 2 && root) {
+          const currentAgent = registeredAgents.find((a: FleetAgentInfo) => a.root === root);
+          if (currentAgent) {
+            setActiveAgentState(currentAgent.name);
+          }
+        }
+      } catch {
+        // Fleet list not available
       }
 
       // Just get lifecycle status — don't make any HTTP calls yet
@@ -87,17 +184,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (status === 'stopped' || status === 'crashed') {
         setHealth(null);
         setServerReady(false);
+        setFleetStatus(null);
       }
     });
+
+    // Subscribe to fleet status updates
+    const unsubFleet = kb.fleet?.onStatusUpdate?.((fleet: FleetStatusData) => {
+      setFleetStatus(fleet);
+      setFleetMode(true);
+
+      // Update agent running states from fleet data
+      setAgents(prev => prev.map(agent => {
+        const fleetAgent = fleet.agents.find(
+          fa => fa.name.toLowerCase() === agent.name.toLowerCase()
+        );
+        return fleetAgent
+          ? { ...agent, running: fleetAgent.status === 'running' }
+          : agent;
+      }));
+    }) ?? (() => {});
 
     return () => {
       unsubHealth();
       unsubStatus();
+      unsubFleet();
     };
   }, []);
 
   return (
-    <AppContext.Provider value={{ agentRoot, apiToken, serverUrl, health, cliStatus, isReady, serverReady }}>
+    <AppContext.Provider value={{
+      agentRoot, apiToken, serverUrl, health, cliStatus, isReady, serverReady,
+      fleetMode, agents, activeAgent, setActiveAgent, fleetStatus,
+    }}>
       {children}
     </AppContext.Provider>
   );

@@ -67,5 +67,5 @@ export function setupIpcHandlers(
   registerConfigHandlers(store);
   registerLogHandlers(lifecycle, getMainWindow);
   registerOnboardingHandlers(store);
-  registerFleetHandlers();
+  registerFleetHandlers(lifecycle, getMainWindow);
 }
