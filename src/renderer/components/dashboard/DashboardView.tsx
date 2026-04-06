@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FleetStatusData } from '../../context/AppContext';
-import { getLogBuffer, subscribeToLogs, setLogAgentRoot } from '../../hooks/useLogs';
+import { getLogBuffer, subscribeToLogs } from '../../hooks/useLogs';
 import AnsiToHtml from 'ansi-to-html';
 
 
@@ -457,22 +457,12 @@ export default function DashboardView() {
   const services = health?.services ?? SERVICE_NAMES.map(name => ({ name, status: isRunning ? 'unknown' : 'stopped' }));
   const ansiConverter = useMemo(() => new AnsiToHtml({ fg: '#a1a1aa', bg: 'transparent', newline: false, escapeXML: true }), []);
 
-  // Tag incoming logs to the running agent's root
-  useEffect(() => {
-    setLogAgentRoot(runningAgentRoot);
-  }, [runningAgentRoot]);
-
-  // When switching agents, load that agent's log buffer
+  // Load logs for the viewed agent and subscribe to updates
   useEffect(() => {
     setLogs([...getLogBuffer(agentRoot)]);
-  }, [agentRoot]);
-
-  // Subscribe to log buffer updates
-  useEffect(() => {
-    return subscribeToLogs((lines) => {
-      // Only update if these logs are for the agent we're viewing
-      const buffer = getLogBuffer(agentRoot);
-      if (lines === buffer) {
+    return subscribeToLogs((root, lines) => {
+      // Only update if these logs are for the agent we're currently viewing
+      if (root === agentRoot) {
         setLogs([...lines]);
       }
     });

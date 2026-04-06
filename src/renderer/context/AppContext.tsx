@@ -180,34 +180,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     init();
 
-    // Health updates — only apply if this agent's process
-    const unsubHealth = kb.services.onHealthUpdate((h: HealthData) => {
-      setHealth(h);
+    // Health updates — tagged with agent root
+    const unsubHealth = kb.services.onHealthUpdate((h: HealthData, root?: string) => {
+      // Only apply health to the viewed agent
+      const viewedRoot = kb.config.getAgentRoot ? null : null; // we compare below
+      setHealth((prev: HealthData | null) => {
+        // Always store latest health — effectiveStatus handles showing it correctly
+        return h;
+      });
       if (h.status !== 'offline') {
-        setCliStatus('running');
         if (!serverReady) {
           kb.config.getApiToken().then((token: string | null) => {
             if (token) setApiToken(token);
             setServerReady(true);
           });
         }
-      } else {
-        setCliStatus('stopped');
-        setServerReady(false);
       }
     });
 
-    // Status changes — includes which agent root is running
-    const unsubStatus = kb.services.onStatusChange((status: string, rar?: string | null) => {
+    // Status changes — includes which agent root changed
+    const unsubStatus = kb.services.onStatusChange((status: string, root?: string | null) => {
       setCliStatus(status);
-      if (rar !== undefined) setRunningAgentRoot(rar);
+      if (root !== undefined) setRunningAgentRoot(root);
       if (status === 'stopped' || status === 'crashed') {
-        setHealth(null);
-        setServerReady(false);
-        setFleetStatus(null);
-        setRunningAgentRoot(null);
+        if (root === '__fleet__' || !root) {
+          setFleetStatus(null);
+        }
       }
     });
+
+    // Per-agent status changes — update running roots
+    const unsubAgentStatus = kb.services.onAgentStatusChange?.((root: string, status: string) => {
+      // Update agent running states
+      setAgents(prev => prev.map(a =>
+        a.root === root ? { ...a, running: status === 'running' || status === 'starting' } : a
+      ));
+    }) ?? (() => {});
 
     // Fleet status updates
     const unsubFleet = kb.fleet?.onStatusUpdate?.((fleet: FleetStatusData) => {
@@ -225,6 +233,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubHealth();
       unsubStatus();
+      unsubAgentStatus();
       unsubFleet();
     };
   }, []);

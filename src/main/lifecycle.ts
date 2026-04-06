@@ -1,14 +1,14 @@
 /**
  * CLI child process lifecycle manager.
  *
- * Spawns `kyberbot run` as a child process, monitors health via HTTP,
- * and manages graceful shutdown. The desktop never imports CLI internals —
- * this is the boundary.
+ * Manages multiple agent processes independently. Each agent gets its own
+ * child process, health polling, log stream, and status tracking.
+ * The desktop app can start/stop any combination of agents.
  */
 
-import { spawn, ChildProcess, execSync } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import { join } from 'path';
-import { existsSync, createWriteStream, mkdirSync, WriteStream } from 'fs';
+import { existsSync, createWriteStream, mkdirSync, readFileSync, WriteStream } from 'fs';
 import { EventEmitter } from 'events';
 import { AppStore } from './store.js';
 import type { HealthData } from '../types/ipc.js';
@@ -32,158 +32,412 @@ export interface FleetStatus {
   pid: number;
 }
 
+// Per-agent process state
+interface AgentProcess {
+  root: string;
+  process: ChildProcess | null;
+  status: CliStatus;
+  health: HealthData | null;
+  healthTimer: ReturnType<typeof setInterval> | null;
+  logStream: WriteStream | null;
+  attached: boolean;
+  restartCount: number;
+  port: number;
+}
+
 export class LifecycleManager extends EventEmitter {
   private store: AppStore;
-  private process: ChildProcess | null = null;
-  private _status: CliStatus = 'stopped';
-  private healthTimer: ReturnType<typeof setInterval> | null = null;
-  private lastHealth: HealthData | null = null;
-  private lastFleetStatus: FleetStatus | null = null;
-  private logStream: WriteStream | null = null;
-  private stdoutBuffer: string[] = [];
-  private readonly MAX_BUFFER_LINES = 1000;
-  private restartCount = 0;
+  private agents = new Map<string, AgentProcess>();
   private readonly MAX_RESTARTS = 10;
-  private attached = false; // true if we attached to an external server (don't kill on quit)
+
+  // Fleet mode (shared process)
+  private fleetProcess: ChildProcess | null = null;
   private _fleetMode = false;
   private _fleetAgents: string[] = [];
-  private _runningAgentRoot: string | null = null;
+  private lastFleetStatus: FleetStatus | null = null;
+  private fleetHealthTimer: ReturnType<typeof setInterval> | null = null;
+  private fleetLogStream: WriteStream | null = null;
 
   constructor(store: AppStore) {
     super();
     this.store = store;
   }
 
+  // ── Public API ──
+
+  /** Status of the currently viewed agent (from store.agentRoot) */
   get status(): CliStatus {
-    return this._status;
+    if (this._fleetMode) {
+      return this.fleetProcess ? 'running' : 'stopped';
+    }
+    const agent = this.getAgentState();
+    return agent?.status || 'stopped';
   }
 
-  get fleetMode(): boolean {
-    return this._fleetMode;
-  }
-
-  set fleetMode(value: boolean) {
-    this._fleetMode = value;
-  }
+  get fleetMode(): boolean { return this._fleetMode; }
+  set fleetMode(v: boolean) { this._fleetMode = v; }
 
   getHealth(): HealthData | null {
-    return this.lastHealth;
+    const agent = this.getAgentState();
+    return agent?.health || null;
   }
 
-  getFleetStatus(): FleetStatus | null {
-    return this.lastFleetStatus;
-  }
+  getFleetStatus(): FleetStatus | null { return this.lastFleetStatus; }
 
   isRunning(): boolean {
-    return this._status === 'running' || this._status === 'starting';
+    const s = this.status;
+    return s === 'running' || s === 'starting';
+  }
+
+  /** Which agent roots have running processes? */
+  getRunningAgentRoot(): string | null {
+    if (this._fleetMode && this.fleetProcess) return '__fleet__';
+    // Return the first running agent root, or the viewed one if running
+    const viewedRoot = this.store.getAgentRoot();
+    if (viewedRoot && this.agents.has(viewedRoot)) {
+      const a = this.agents.get(viewedRoot)!;
+      if (a.status === 'running' || a.status === 'starting') return viewedRoot;
+    }
+    return null;
+  }
+
+  /** Get all running agent roots */
+  getRunningAgentRoots(): string[] {
+    const roots: string[] = [];
+    for (const [root, agent] of this.agents) {
+      if (agent.status === 'running' || agent.status === 'starting') {
+        roots.push(root);
+      }
+    }
+    return roots;
   }
 
   getAgentRoot(): string | null {
     return this.store.getAgentRoot();
   }
 
-  /** Which agent root is the running process actually serving? */
-  getRunningAgentRoot(): string | null {
-    return this._runningAgentRoot;
+  /** Check if a specific agent root is running */
+  isAgentRunning(root: string): boolean {
+    if (this._fleetMode && this.fleetProcess) return true;
+    const agent = this.agents.get(root);
+    return agent?.status === 'running' || agent?.status === 'starting' || false;
   }
 
-  getRecentLogs(): string[] {
-    return [...this.stdoutBuffer];
+  /** Get status for a specific agent root */
+  getAgentStatus(root: string): CliStatus {
+    if (this._fleetMode && this.fleetProcess) return 'running';
+    return this.agents.get(root)?.status || 'stopped';
   }
 
-  // ── Fleet mode methods ──
+  getRecentLogs(): string[] { return []; } // Logs are per-agent via IPC events now
 
-  async startFleet(agents: string[]): Promise<void> {
-    if (this.process) return;
+  // ── Single-agent start/stop ──
 
-    this._fleetMode = true;
-    this._fleetAgents = agents;
-    this._runningAgentRoot = '__fleet__';
-
-    // Check if a fleet server is already running on the expected port
-    try {
-      const port = this.getServerPort();
-      const res = await fetch(`http://localhost:${port}/fleet`, { signal: AbortSignal.timeout(2000) });
-      if (res.ok) {
-        console.log('[lifecycle] Fleet server already running on port', port, '— attaching');
-        this._status = 'running';
-        this.attached = true;
-        this.lastFleetStatus = await res.json() as FleetStatus;
-        this.emit('status-change', this._status);
-        this.startHealthPolling();
-        return;
-      }
-    } catch {
-      // No fleet server running, proceed to spawn
+  async startCli(): Promise<void> {
+    if (this._fleetMode && this._fleetAgents.length > 0) {
+      return this.startFleet(this._fleetAgents);
     }
 
-    this.restartCount = 0;
-    this.spawnFleetProcess(agents);
+    const agentRoot = this.store.getAgentRoot();
+    if (!agentRoot) throw new Error('Agent root not configured');
+
+    // Already running?
+    const existing = this.agents.get(agentRoot);
+    if (existing && (existing.status === 'running' || existing.status === 'starting')) {
+      return;
+    }
+
+    const port = this.getPortForRoot(agentRoot);
+
+    // Check if server already running on this port
+    try {
+      const res = await fetch(`http://localhost:${port}/health`, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) {
+        console.log(`[lifecycle] Server already running on port ${port} — attaching`);
+        const agent = this.ensureAgent(agentRoot, port);
+        agent.status = 'running';
+        agent.attached = true;
+        this.emitAgentStatus(agentRoot);
+        this.startAgentHealthPolling(agentRoot);
+        return;
+      }
+    } catch { /* not running */ }
+
+    this.spawnAgentProcess(agentRoot, port);
   }
 
-  async stopFleet(): Promise<void> {
-    this.stopHealthPolling();
+  async stopCli(): Promise<void> {
+    if (this._fleetMode) return this.stopFleet();
 
-    if (!this.process) {
-      if (this.attached) {
-        console.log('[lifecycle] Detaching from external fleet server (not killing)');
-        this._status = 'stopped';
-        this.attached = false;
-        this._fleetMode = false;
-        this.lastFleetStatus = null;
-        this.emit('status-change', this._status);
+    const agentRoot = this.store.getAgentRoot();
+    if (!agentRoot) return;
+
+    await this.stopAgent(agentRoot);
+  }
+
+  /** Stop a specific agent by root */
+  async stopAgent(root: string): Promise<void> {
+    const agent = this.agents.get(root);
+    if (!agent) return;
+
+    this.stopAgentHealthPolling(root);
+
+    if (!agent.process) {
+      if (agent.attached) {
+        agent.status = 'stopped';
+        agent.attached = false;
+        this.emitAgentStatus(root);
       }
       return;
     }
 
-    this._status = 'stopping';
-    this.emit('status-change', this._status);
-    console.log('[lifecycle] Sending SIGTERM to fleet process...');
+    agent.status = 'stopping';
+    this.emitAgentStatus(root);
 
-    this.process.kill('SIGTERM');
-
+    agent.process.kill('SIGTERM');
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
-        if (this.process) this.process.kill('SIGKILL');
+        agent.process?.kill('SIGKILL');
         resolve();
       }, 10_000);
-
-      this.process?.on('exit', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
+      agent.process?.on('exit', () => { clearTimeout(timeout); resolve(); });
     });
 
-    this.process = null;
-    this.logStream?.end();
-    this.logStream = null;
-    this._status = 'stopped';
-    this._fleetMode = false;
-    this._runningAgentRoot = null;
-    this.lastFleetStatus = null;
-    this.emit('status-change', this._status);
+    agent.process = null;
+    agent.logStream?.end();
+    agent.logStream = null;
+    agent.status = 'stopped';
+    agent.health = null;
+    this.emitAgentStatus(root);
   }
 
-  private spawnFleetProcess(agents: string[]): void {
-    this._status = 'starting';
-    this.emit('status-change', this._status);
+  // ── Fleet mode ──
+
+  async startFleet(agents: string[]): Promise<void> {
+    if (this.fleetProcess) return;
+
+    this._fleetMode = true;
+    this._fleetAgents = agents;
+
+    const port = 3456;
+    try {
+      const res = await fetch(`http://localhost:${port}/fleet`, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) {
+        this.lastFleetStatus = await res.json() as FleetStatus;
+        this.emit('status-change', 'running', '__fleet__');
+        this.startFleetHealthPolling();
+        return;
+      }
+    } catch { /* not running */ }
+
+    this.spawnFleetProcess(agents);
+  }
+
+  async stopFleet(): Promise<void> {
+    if (this.fleetHealthTimer) { clearInterval(this.fleetHealthTimer); this.fleetHealthTimer = null; }
+
+    if (!this.fleetProcess) {
+      this._fleetMode = false;
+      this.lastFleetStatus = null;
+      this.emit('status-change', 'stopped', null);
+      return;
+    }
+
+    this.emit('status-change', 'stopping', '__fleet__');
+    this.fleetProcess.kill('SIGTERM');
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => { this.fleetProcess?.kill('SIGKILL'); resolve(); }, 10_000);
+      this.fleetProcess?.on('exit', () => { clearTimeout(timeout); resolve(); });
+    });
+
+    this.fleetProcess = null;
+    this.fleetLogStream?.end();
+    this.fleetLogStream = null;
+    this._fleetMode = false;
+    this.lastFleetStatus = null;
+    this.emit('status-change', 'stopped', null);
+  }
+
+  /** Graceful shutdown of everything */
+  async shutdown(): Promise<void> {
+    if (this._fleetMode) {
+      await this.stopFleet();
+    }
+    for (const root of this.agents.keys()) {
+      await this.stopAgent(root);
+    }
+  }
+
+  // ── Private: per-agent process management ──
+
+  private ensureAgent(root: string, port: number): AgentProcess {
+    if (!this.agents.has(root)) {
+      this.agents.set(root, {
+        root,
+        process: null,
+        status: 'stopped',
+        health: null,
+        healthTimer: null,
+        logStream: null,
+        attached: false,
+        restartCount: 0,
+        port,
+      });
+    }
+    return this.agents.get(root)!;
+  }
+
+  private spawnAgentProcess(root: string, port: number): void {
+    const agent = this.ensureAgent(root, port);
+    agent.status = 'starting';
+    agent.restartCount = 0;
+    this.emitAgentStatus(root);
 
     const cliPath = this.resolveCliPath();
     const fullPath = this.getFullPath();
 
-    // Use the first agent's root for log directory
+    // Logs
+    const logDir = join(root, 'logs');
+    if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
+    agent.logStream = createWriteStream(join(logDir, 'desktop-cli.log'), { flags: 'a' });
+
+    // Load .env
+    const agentEnv: Record<string, string> = {};
+    try {
+      const envContent = readFileSync(join(root, '.env'), 'utf-8');
+      for (const line of envContent.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx > 0) agentEnv[trimmed.slice(0, eqIdx)] = trimmed.slice(eqIdx + 1);
+      }
+    } catch {}
+
+    agent.process = spawn(cliPath, ['run'], {
+      cwd: root,
+      env: {
+        ...process.env,
+        ...agentEnv,
+        KYBERBOT_ROOT: root,
+        KYBERBOT_CHILD: '1',
+        NODE_ENV: 'production',
+        PATH: fullPath,
+        FORCE_COLOR: '3',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false,
+    });
+
+    agent.process.stdout?.on('data', (data: Buffer) => {
+      const lines = data.toString().split('\n').filter(Boolean);
+      for (const line of lines) {
+        this.emit('log-line', root, line);
+        agent.logStream?.write(line + '\n');
+      }
+    });
+
+    agent.process.stderr?.on('data', (data: Buffer) => {
+      const lines = data.toString().split('\n').filter(Boolean);
+      for (const line of lines) {
+        this.emit('log-line', root, `[stderr] ${line}`);
+        agent.logStream?.write(`[stderr] ${line}\n`);
+      }
+    });
+
+    agent.process.on('error', (error: Error) => {
+      agent.status = 'crashed';
+      this.emitAgentStatus(root);
+    });
+
+    agent.process.on('exit', (code) => {
+      agent.process = null;
+      agent.logStream?.end();
+      agent.logStream = null;
+
+      if (agent.status === 'stopping') {
+        agent.status = 'stopped';
+        this.emitAgentStatus(root);
+        return;
+      }
+
+      agent.status = 'crashed';
+      this.emitAgentStatus(root);
+
+      if (code !== 0 && agent.restartCount < this.MAX_RESTARTS) {
+        agent.restartCount++;
+        const delay = agent.restartCount > 3 ? 10_000 : 2_000;
+        setTimeout(() => this.spawnAgentProcess(root, port), delay);
+      }
+    });
+
+    setTimeout(() => this.startAgentHealthPolling(root), 3000);
+  }
+
+  private startAgentHealthPolling(root: string): void {
+    const agent = this.agents.get(root);
+    if (!agent) return;
+    this.stopAgentHealthPolling(root);
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`http://localhost:${agent.port}/health`, {
+          signal: AbortSignal.timeout(5000),
+        });
+        const data = await res.json() as HealthData;
+        agent.health = data;
+
+        if (agent.status === 'starting') {
+          agent.status = 'running';
+          this.emitAgentStatus(root);
+        }
+
+        this.emit('health-update', root, data);
+      } catch {
+        if (agent.status === 'running') {
+          agent.health = { status: 'offline', timestamp: new Date().toISOString(), uptime: '0s', channels: [], services: [], errors: 0, memory: {}, pid: 0, node_version: '' } as HealthData;
+          this.emit('health-update', root, agent.health);
+        }
+      }
+    };
+
+    poll();
+    agent.healthTimer = setInterval(poll, 5000);
+  }
+
+  private stopAgentHealthPolling(root: string): void {
+    const agent = this.agents.get(root);
+    if (agent?.healthTimer) {
+      clearInterval(agent.healthTimer);
+      agent.healthTimer = null;
+    }
+  }
+
+  private emitAgentStatus(root: string): void {
+    const agent = this.agents.get(root);
+    if (!agent) return;
+    this.emit('agent-status-change', root, agent.status);
+    // Also emit generic status-change for the currently viewed agent
+    if (root === this.store.getAgentRoot()) {
+      this.emit('status-change', agent.status, root);
+    }
+  }
+
+  // ── Private: fleet process management ──
+
+  private spawnFleetProcess(agents: string[]): void {
+    this.emit('status-change', 'starting', '__fleet__');
+
+    const cliPath = this.resolveCliPath();
+    const fullPath = this.getFullPath();
     const agentRoot = this.store.getAgentRoot();
+
     if (agentRoot) {
       const logDir = join(agentRoot, 'logs');
       if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
-      const logPath = join(logDir, 'desktop-fleet.log');
-      this.logStream = createWriteStream(logPath, { flags: 'a' });
+      this.fleetLogStream = createWriteStream(join(logDir, 'desktop-fleet.log'), { flags: 'a' });
     }
 
-    // Spawn: kyberbot fleet start --only name1,name2
-    const args = ['fleet', 'start', '--only', agents.join(',')];
-
-    this.process = spawn(cliPath, args, {
+    this.fleetProcess = spawn(cliPath, ['fleet', 'start', '--only', agents.join(',')], {
       cwd: agentRoot || undefined,
       env: {
         ...process.env,
@@ -196,408 +450,112 @@ export class LifecycleManager extends EventEmitter {
       shell: false,
     });
 
-    this.process.stdout?.on('data', (data: Buffer) => {
-      const lines = data.toString().split('\n').filter(Boolean);
-      for (const line of lines) {
-        this.pushLogLine(line);
-        this.logStream?.write(line + '\n');
+    this.fleetProcess.stdout?.on('data', (data: Buffer) => {
+      for (const line of data.toString().split('\n').filter(Boolean)) {
+        this.emit('log-line', '__fleet__', line);
+        this.fleetLogStream?.write(line + '\n');
       }
     });
 
-    this.process.stderr?.on('data', (data: Buffer) => {
-      const lines = data.toString().split('\n').filter(Boolean);
-      for (const line of lines) {
-        this.pushLogLine(`[stderr] ${line}`);
-        this.logStream?.write(`[stderr] ${line}\n`);
+    this.fleetProcess.stderr?.on('data', (data: Buffer) => {
+      for (const line of data.toString().split('\n').filter(Boolean)) {
+        this.emit('log-line', '__fleet__', `[stderr] ${line}`);
+        this.fleetLogStream?.write(`[stderr] ${line}\n`);
       }
     });
 
-    this.process.on('error', (error: Error) => {
-      this._status = 'crashed';
-      this.emit('status-change', this._status);
-      this.emit('error', error.message);
+    this.fleetProcess.on('exit', (code) => {
+      this.fleetProcess = null;
+      this.fleetLogStream?.end();
+      this.fleetLogStream = null;
+      this._fleetMode = false;
+      this.lastFleetStatus = null;
+      this.emit('status-change', 'stopped', null);
     });
 
-    this.process.on('exit', (code) => {
-      this.process = null;
-      this.logStream?.end();
-      this.logStream = null;
-
-      if (this._status === 'stopping') {
-        this._status = 'stopped';
-        this.emit('status-change', this._status);
-        return;
-      }
-
-      this._status = 'crashed';
-      this.emit('status-change', this._status);
-      this.emit('error', `Fleet process exited with code ${code}`);
-
-      if (code !== 0 && this.restartCount < this.MAX_RESTARTS) {
-        this.restartCount++;
-        const delay = this.restartCount > 3 ? 10_000 : 2_000;
-        setTimeout(() => this.spawnFleetProcess(agents), delay);
-      }
-    });
-
-    // Start health polling after startup delay
-    setTimeout(() => this.startHealthPolling(), 3000);
+    setTimeout(() => this.startFleetHealthPolling(), 3000);
   }
 
-  async startCli(): Promise<void> {
-    // In fleet mode, delegate to startFleet
-    if (this._fleetMode && this._fleetAgents.length > 0) {
-      return this.startFleet(this._fleetAgents);
-    }
-
-    if (this.process) return;
-
-    // Record which agent we're starting
-    this._runningAgentRoot = this.store.getAgentRoot();
-
-    // Check if a server is already running on the expected port
-    try {
-      const port = this.getServerPort();
-      const res = await fetch(`http://localhost:${port}/health`, { signal: AbortSignal.timeout(2000) });
-      if (res.ok) {
-        // Server already running (started externally or from a previous session)
-        console.log('[lifecycle] Server already running on port', port, '— attaching');
-        this._status = 'running';
-        this.attached = true;
-        this.emit('status-change', this._status);
-        this.startHealthPolling();
-        return;
-      }
-    } catch {
-      // No server running, proceed to spawn
-    }
-
-    this.restartCount = 0;
-    this.spawnProcess();
-  }
-
-  async stopCli(): Promise<void> {
-    // In fleet mode, delegate to stopFleet
-    if (this._fleetMode) {
-      return this.stopFleet();
-    }
-
-    this.stopHealthPolling();
-
-    if (!this.process) {
-      // We were attached to an external server — don't kill it
-      if (this.attached) {
-        console.log('[lifecycle] Detaching from external server (not killing)');
-        this._status = 'stopped';
-        this.attached = false;
-        this.emit('status-change', this._status);
-      }
-      return;
-    }
-    this._status = 'stopping';
-    this.emit('status-change', this._status);
-    console.log('[lifecycle] Sending SIGTERM to CLI process...');
-
-    this.process.kill('SIGTERM');
-
-    await new Promise<void>((resolve) => {
-      const timeout = setTimeout(() => {
-        if (this.process) this.process.kill('SIGKILL');
-        resolve();
-      }, 10_000);
-
-      this.process?.on('exit', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
-    });
-
-    this.process = null;
-    this.logStream?.end();
-    this.logStream = null;
-    this._status = 'stopped';
-    this._runningAgentRoot = null;
-    this.emit('status-change', this._status);
-  }
-
-  private spawnProcess(): void {
-    const agentRoot = this.store.getAgentRoot();
-    if (!agentRoot) throw new Error('Agent root not configured');
-
-    this._status = 'starting';
-    this.emit('status-change', this._status);
-
-    const cliPath = this.resolveCliPath();
-
-    // Ensure logs directory
-    const logDir = join(agentRoot, 'logs');
-    if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
-
-    const logPath = join(logDir, 'desktop-cli.log');
-    this.logStream = createWriteStream(logPath, { flags: 'a' });
-
-    // Load the agent's .env so both the spawn and IPC handlers use the same token
-    const agentEnv: Record<string, string> = {};
-    try {
-      const envContent = require('fs').readFileSync(join(agentRoot, '.env'), 'utf-8');
-      for (const line of envContent.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
-        const eqIdx = trimmed.indexOf('=');
-        if (eqIdx > 0) agentEnv[trimmed.slice(0, eqIdx)] = trimmed.slice(eqIdx + 1);
-      }
-    } catch {}
-
-    // Spawn kyberbot directly (it has its own shebang with node + max-old-space-size)
-    const fullPath = this.getFullPath();
-    this.process = spawn(cliPath, ['run'], {
-      cwd: agentRoot,
-      env: {
-        ...process.env,
-        ...agentEnv, // Agent's .env vars (including KYBERBOT_API_TOKEN)
-        KYBERBOT_ROOT: agentRoot,
-        KYBERBOT_CHILD: '1', // Disables CLI's built-in watchdog (run.ts:64)
-        NODE_ENV: 'production',
-        PATH: fullPath, // Full PATH including nvm/homebrew for packaged app
-        FORCE_COLOR: '3', // Force chalk to output full 24-bit ANSI color codes even when piped
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false,
-    });
-
-    this.process.stdout?.on('data', (data: Buffer) => {
-      const lines = data.toString().split('\n').filter(Boolean);
-      for (const line of lines) {
-        this.pushLogLine(line);
-        this.logStream?.write(line + '\n');
-      }
-    });
-
-    this.process.stderr?.on('data', (data: Buffer) => {
-      const lines = data.toString().split('\n').filter(Boolean);
-      for (const line of lines) {
-        this.pushLogLine(`[stderr] ${line}`);
-        this.logStream?.write(`[stderr] ${line}\n`);
-      }
-    });
-
-    this.process.on('error', (error: Error) => {
-      this._status = 'crashed';
-      this.emit('status-change', this._status);
-      this.emit('error', error.message);
-    });
-
-    this.process.on('exit', (code) => {
-      this.process = null;
-      this.logStream?.end();
-      this.logStream = null;
-
-      if (this._status === 'stopping') {
-        this._status = 'stopped';
-        this.emit('status-change', this._status);
-        return;
-      }
-
-      this._status = 'crashed';
-      this.emit('status-change', this._status);
-      this.emit('error', `CLI exited with code ${code}`);
-
-      if (code !== 0 && this.restartCount < this.MAX_RESTARTS) {
-        this.restartCount++;
-        const delay = this.restartCount > 3 ? 10_000 : 2_000;
-        setTimeout(() => this.spawnProcess(), delay);
-      }
-    });
-
-    // Start health polling after startup delay
-    setTimeout(() => this.startHealthPolling(), 3000);
-  }
-
-  private startHealthPolling(): void {
-    this.stopHealthPolling();
+  private startFleetHealthPolling(): void {
+    if (this.fleetHealthTimer) clearInterval(this.fleetHealthTimer);
 
     const poll = async () => {
       try {
-        const port = this.getServerPort();
+        const res = await fetch('http://localhost:3456/fleet', { signal: AbortSignal.timeout(5000) });
+        const data = await res.json() as FleetStatus;
+        this.lastFleetStatus = data;
 
-        if (this._fleetMode) {
-          // Fleet mode: poll /fleet endpoint
-          const response = await fetch(`http://localhost:${port}/fleet`, {
-            signal: AbortSignal.timeout(5000),
-          });
-          const fleetData = await response.json() as FleetStatus;
-          this.lastFleetStatus = fleetData;
+        const healthData: HealthData = {
+          status: data.agents.every(a => a.status === 'running') ? 'ok' : 'degraded',
+          timestamp: new Date().toISOString(),
+          uptime: data.uptime,
+          channels: data.agents.flatMap(a => a.channels ?? []),
+          services: data.agents.flatMap(a => (a.services ?? []).map(s => ({ name: `${a.name}/${s.name}`, status: s.status }))),
+          errors: 0, memory: {}, pid: data.pid, node_version: '',
+        };
 
-          // Synthesize a HealthData from fleet status for backward compat
-          const healthData: HealthData = {
-            status: fleetData.agents.every(a => a.status === 'running') ? 'ok' : 'degraded',
-            timestamp: new Date().toISOString(),
-            uptime: fleetData.uptime,
-            channels: fleetData.agents.flatMap(a => a.channels ?? []),
-            services: fleetData.agents.flatMap(a =>
-              (a.services ?? []).map(s => ({ name: `${a.name}/${s.name}`, status: s.status }))
-            ),
-            errors: 0,
-            memory: {},
-            pid: fleetData.pid,
-            node_version: '',
-          };
-          this.lastHealth = healthData;
-
-          if (this._status === 'starting') {
-            this._status = 'running';
-            this.emit('status-change', this._status);
-          }
-
-          this.emit('health-update', healthData);
-          this.emit('fleet-status-update', fleetData);
-        } else {
-          // Single-agent mode: poll /health endpoint
-          const response = await fetch(`http://localhost:${port}/health`, {
-            signal: AbortSignal.timeout(5000),
-          });
-          const data = await response.json() as HealthData;
-          this.lastHealth = data;
-
-          if (this._status === 'starting') {
-            this._status = 'running';
-            this.emit('status-change', this._status);
-          }
-
-          this.emit('health-update', data);
-        }
+        if (!this._fleetMode) { this._fleetMode = true; }
+        this.emit('status-change', 'running', '__fleet__');
+        this.emit('health-update', '__fleet__', healthData);
+        this.emit('fleet-status-update', data);
       } catch {
-        if (this._status === 'running') {
-          const offlineHealth: HealthData = {
-            status: 'offline',
-            timestamp: new Date().toISOString(),
-            uptime: '0s',
-            channels: [],
-            services: [],
-            errors: 0,
-            memory: {},
-            pid: 0,
-            node_version: '',
-          };
-          this.lastHealth = offlineHealth;
-          this.lastFleetStatus = null;
-          this.emit('health-update', offlineHealth);
-        }
+        // Fleet not responding
       }
     };
 
     poll();
-    this.healthTimer = setInterval(poll, 5000);
+    this.fleetHealthTimer = setInterval(poll, 5000);
   }
 
-  private stopHealthPolling(): void {
-    if (this.healthTimer) {
-      clearInterval(this.healthTimer);
-      this.healthTimer = null;
-    }
+  // ── Private: utilities ──
+
+  private getPortForRoot(root: string): number {
+    try {
+      const yaml = require('js-yaml');
+      const identity = yaml.load(readFileSync(join(root, 'identity.yaml'), 'utf-8'));
+      return identity?.server?.port ?? 3456;
+    } catch { return 3456; }
   }
 
   private getServerPort(): number {
-    const agentRoot = this.store.getAgentRoot();
-    if (!agentRoot) return 3456;
-    try {
-      const yaml = require('js-yaml');
-      const fs = require('fs');
-      const identity = yaml.load(fs.readFileSync(join(agentRoot, 'identity.yaml'), 'utf-8'));
-      return identity?.server?.port ?? 3456;
-    } catch {
-      return 3456;
-    }
-  }
-
-  /**
-   * Build a full PATH that includes common Node/nvm/homebrew locations.
-   * Electron's packaged app doesn't inherit the user's shell PATH.
-   */
-  private getFullPath(): string {
-    const home = process.env.HOME || '';
-    const existing = process.env.PATH || '';
-    const extras = [
-      join(home, '.local/bin'),          // claude CLI installs here
-      '/usr/local/bin',
-      '/opt/homebrew/bin',
-      join(home, '.npm-global/bin'),
-      join(home, '.yarn/bin'),
-      '/usr/bin',
-      '/bin',
-    ];
-
-    // Find nvm node versions — put the HIGHEST version first
-    // (kyberbot is compiled against the latest node, better-sqlite3
-    // native module must match the node version that runs it)
-    const nvmDir = join(home, '.nvm/versions/node');
-    const nvmPaths: string[] = [];
-    try {
-      const versions = require('fs').readdirSync(nvmDir) as string[];
-      // Sort descending so newest node is first on PATH
-      versions.sort((a: string, b: string) => {
-        const va = a.replace('v', '').split('.').map(Number);
-        const vb = b.replace('v', '').split('.').map(Number);
-        for (let i = 0; i < 3; i++) {
-          if ((vb[i] || 0) !== (va[i] || 0)) return (vb[i] || 0) - (va[i] || 0);
-        }
-        return 0;
-      });
-      for (const v of versions) {
-        nvmPaths.push(join(nvmDir, v, 'bin'));
-      }
-    } catch { /* nvm not installed */ }
-
-    const allPaths = [...nvmPaths, ...extras, ...existing.split(':')];
-    return [...new Set(allPaths)].join(':');
+    const root = this.store.getAgentRoot();
+    if (!root) return 3456;
+    return this.getPortForRoot(root);
   }
 
   private resolveCliPath(): string {
-    const fullPath = this.getFullPath();
-
-    // Try `which kyberbot` with full PATH
-    try {
-      const globalPath = execSync('which kyberbot', {
-        encoding: 'utf-8',
-        env: { ...process.env, PATH: fullPath },
-      }).trim();
-      if (globalPath) return globalPath;
-    } catch { /* not found */ }
-
-    // Check common global install locations directly
-    const home = process.env.HOME || '';
-    const candidates = [
-      // nvm installs
-      ...(() => {
-        try {
-          const nvmDir = join(home, '.nvm/versions/node');
-          return require('fs').readdirSync(nvmDir).map((v: string) => join(nvmDir, v, 'bin', 'kyberbot'));
-        } catch { return []; }
-      })(),
-      '/usr/local/bin/kyberbot',
-      '/opt/homebrew/bin/kyberbot',
-      join(home, '.npm-global/bin/kyberbot'),
-    ];
-
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) return candidate;
-    }
-
-    // Check agent root node_modules
-    const agentRoot = this.store.getAgentRoot();
-    if (agentRoot) {
-      const localCli = join(agentRoot, 'node_modules', '@kyberbot', 'cli', 'dist', 'index.js');
-      if (existsSync(localCli)) return localCli;
-    }
-
-    throw new Error('kyberbot CLI not found. Install with: npm install -g @kyberbot/cli');
+    const which = (cmd: string): string | null => {
+      try {
+        const { execSync } = require('child_process');
+        return execSync(`which ${cmd}`, { encoding: 'utf-8', env: { ...process.env, PATH: this.getFullPath() } }).trim();
+      } catch { return null; }
+    };
+    return which('kyberbot') || 'kyberbot';
   }
 
-  private pushLogLine(line: string): void {
-    this.stdoutBuffer.push(line);
-    if (this.stdoutBuffer.length > this.MAX_BUFFER_LINES) {
-      this.stdoutBuffer.shift();
-    }
-    this.emit('log-line', line);
+  private getFullPath(): string {
+    const { homedir } = require('os');
+    const home = homedir();
+    const paths: string[] = [];
+
+    // nvm versions (newest first)
+    try {
+      const nvmDir = join(home, '.nvm', 'versions', 'node');
+      if (existsSync(nvmDir)) {
+        const { readdirSync } = require('fs');
+        const versions = readdirSync(nvmDir).filter((v: string) => v.startsWith('v')).sort().reverse();
+        for (const v of versions) paths.push(join(nvmDir, v, 'bin'));
+      }
+    } catch {}
+
+    paths.push(
+      join(home, '.local', 'bin'),
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/usr/bin',
+      '/bin',
+    );
+
+    return paths.join(':') + ':' + (process.env.PATH || '');
   }
 }

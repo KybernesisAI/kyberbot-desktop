@@ -23,17 +23,21 @@ const api = {
   services: {
     start: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SERVICES_START),
     stop: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SERVICES_STOP),
-    getStatus: (): Promise<{ status: string; health: HealthData | null }> =>
-      ipcRenderer.invoke(IPC.SERVICES_STATUS),
-    onHealthUpdate: (callback: (health: HealthData) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, health: HealthData) => callback(health);
+    getStatus: (): Promise<any> => ipcRenderer.invoke(IPC.SERVICES_STATUS),
+    onHealthUpdate: (callback: (health: HealthData, root?: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, health: HealthData, root?: string) => callback(health, root);
       ipcRenderer.on(IPC.SERVICES_HEALTH_UPDATE, handler);
       return () => ipcRenderer.removeListener(IPC.SERVICES_HEALTH_UPDATE, handler);
     },
-    onStatusChange: (callback: (status: string, runningAgentRoot?: string | null) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, status: string, runningAgentRoot?: string | null) => callback(status, runningAgentRoot);
+    onStatusChange: (callback: (status: string, root?: string | null) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: string, root?: string | null) => callback(status, root);
       ipcRenderer.on('services:status-change', handler);
       return () => ipcRenderer.removeListener('services:status-change', handler);
+    },
+    onAgentStatusChange: (callback: (root: string, status: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, root: string, status: string) => callback(root, status);
+      ipcRenderer.on('services:agent-status-change', handler);
+      return () => ipcRenderer.removeListener('services:agent-status-change', handler);
     },
   },
 
@@ -54,10 +58,16 @@ const api = {
   },
 
   logs: {
-    onLine: (callback: (line: string) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, line: string) => callback(line);
-      ipcRenderer.on(IPC.LOGS_LINE, handler);
-      return () => ipcRenderer.removeListener(IPC.LOGS_LINE, handler);
+    onLine: (callback: (line: string, root?: string) => void): (() => void) => {
+      // Listen to both old-style (IPC.LOGS_LINE) and new per-agent log events
+      const handler1 = (_event: Electron.IpcRendererEvent, line: string) => callback(line);
+      const handler2 = (_event: Electron.IpcRendererEvent, root: string, line: string) => callback(line, root);
+      ipcRenderer.on(IPC.LOGS_LINE, handler1);
+      ipcRenderer.on('services:log-line', handler2);
+      return () => {
+        ipcRenderer.removeListener(IPC.LOGS_LINE, handler1);
+        ipcRenderer.removeListener('services:log-line', handler2);
+      };
     },
   },
 

@@ -1,7 +1,7 @@
 /**
  * Service lifecycle IPC handlers.
  * Proxies to the LifecycleManager for start/stop/status.
- * Pushes status-change events to the renderer.
+ * Pushes per-agent status and log events to the renderer.
  */
 
 import { ipcMain, BrowserWindow } from 'electron';
@@ -23,18 +23,44 @@ export function registerServiceHandlers(
   });
 
   ipcMain.handle(IPC.SERVICES_STATUS, () => {
+    const root = lifecycle.getAgentRoot();
     return {
       status: lifecycle.status,
       health: lifecycle.getHealth(),
       runningAgentRoot: lifecycle.getRunningAgentRoot(),
+      runningRoots: lifecycle.getRunningAgentRoots(),
+      isThisAgentRunning: root ? lifecycle.isAgentRunning(root) : false,
     };
   });
 
-  // Push status changes to renderer so dashboard updates immediately
-  lifecycle.on('status-change', (status: string) => {
+  // Push per-agent status changes
+  lifecycle.on('status-change', (status: string, root: string | null) => {
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {
-      win.webContents.send('services:status-change', status, lifecycle.getRunningAgentRoot());
+      win.webContents.send('services:status-change', status, root);
+    }
+  });
+
+  lifecycle.on('agent-status-change', (root: string, status: string) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('services:agent-status-change', root, status);
+    }
+  });
+
+  // Push per-agent health updates
+  lifecycle.on('health-update', (root: string, health: any) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(IPC.SERVICES_HEALTH_UPDATE, health, root);
+    }
+  });
+
+  // Push per-agent log lines
+  lifecycle.on('log-line', (root: string, line: string) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('services:log-line', root, line);
     }
   });
 }
