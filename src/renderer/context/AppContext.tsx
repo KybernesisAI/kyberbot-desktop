@@ -9,7 +9,7 @@
  * and switching is instant with /agent/{name} routing.
  */
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { HealthData } from '../../types/ipc';
 
 export interface FleetAgentInfo {
@@ -92,6 +92,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeAgent, setActiveAgentState] = useState<string | null>(null);
   const [fleetStatus, setFleetStatus] = useState<FleetStatusData | null>(null);
   const [runningAgentRoot, setRunningAgentRoot] = useState<string | null>(null);
+
+  // Ref to track current agentRoot for event handlers (closures capture stale state)
+  const agentRootRef = useRef<string | null>(null);
+  useEffect(() => { agentRootRef.current = agentRoot; }, [agentRoot]);
 
   // Fleet mode = fleet server confirmed running
   const fleetMode = fleetStatus !== null;
@@ -180,14 +184,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     init();
 
-    // Health updates — tagged with agent root
+    // Health updates — only apply if from the currently viewed agent
     const unsubHealth = kb.services.onHealthUpdate((h: HealthData, root?: string) => {
-      // Only apply health to the viewed agent
-      const viewedRoot = kb.config.getAgentRoot ? null : null; // we compare below
-      setHealth((prev: HealthData | null) => {
-        // Always store latest health — effectiveStatus handles showing it correctly
-        return h;
-      });
+      // Skip health updates from other agents
+      if (root && root !== agentRootRef.current && root !== '__fleet__') return;
+
+      setHealth(h);
       if (h.status !== 'offline') {
         if (!serverReady) {
           kb.config.getApiToken().then((token: string | null) => {
@@ -198,9 +200,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Status changes — includes which agent root changed
+    // Status changes — only update cliStatus if from the viewed agent or fleet
     const unsubStatus = kb.services.onStatusChange((status: string, root?: string | null) => {
-      setCliStatus(status);
+      // Update cliStatus only for the viewed agent or fleet-wide events
+      if (!root || root === agentRootRef.current || root === '__fleet__') {
+        setCliStatus(status);
+      }
       if (root !== undefined) setRunningAgentRoot(root);
       if (status === 'stopped' || status === 'crashed') {
         if (root === '__fleet__' || !root) {
