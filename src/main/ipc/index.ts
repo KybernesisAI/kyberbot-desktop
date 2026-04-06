@@ -12,6 +12,7 @@ import { registerServiceHandlers } from './services.js';
 import { registerConfigHandlers } from './config.js';
 import { registerLogHandlers } from './logs.js';
 import { registerOnboardingHandlers } from './onboarding.js';
+import { registerFleetHandlers } from './fleet.js';
 
 export function setupIpcHandlers(
   lifecycle: LifecycleManager,
@@ -66,4 +67,5 @@ export function setupIpcHandlers(
   registerConfigHandlers(store);
   registerLogHandlers(lifecycle, getMainWindow);
   registerOnboardingHandlers(store);
+  registerFleetHandlers(lifecycle, getMainWindow);
 }

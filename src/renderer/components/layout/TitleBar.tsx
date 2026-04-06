@@ -4,15 +4,18 @@
  * Uses lucide-react icons matching Samantha.
  */
 
-import { useState, useEffect } from 'react';
-import { Moon, Sun, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Moon, Sun, ChevronDown, FolderOpen, Plus, Circle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import type { FleetAgentInfo } from '../../context/AppContext';
 
 export default function TitleBar() {
-  const { agentRoot } = useApp();
+  const { agentRoot, fleetMode, agents: contextAgents, activeAgent, setActiveAgent } = useApp();
   const [agentName, setAgentName] = useState('KyberBot');
   const [isDark, setIsDark] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
+  const [fleetAgents, setFleetAgents] = useState<FleetAgentInfo[]>([]);
+  const [loadingFleet, setLoadingFleet] = useState(false);
 
   useEffect(() => {
     const kb = (window as any).kyberbot;
@@ -22,6 +25,40 @@ export default function TitleBar() {
     });
     setIsDark(!document.documentElement.classList.contains('light'));
   }, [agentRoot]);
+
+  // Keep fleetAgents in sync with context agents
+  useEffect(() => {
+    if (contextAgents.length > 0) {
+      setFleetAgents(contextAgents);
+    }
+  }, [contextAgents]);
+
+  // Update displayed name when active agent changes in fleet mode
+  useEffect(() => {
+    if (fleetMode && activeAgent) {
+      setAgentName(activeAgent);
+    }
+  }, [fleetMode, activeAgent]);
+
+  const loadFleet = useCallback(async () => {
+    const kb = (window as any).kyberbot;
+    if (!kb?.fleet) return;
+    setLoadingFleet(true);
+    try {
+      const agents = await kb.fleet.list();
+      setFleetAgents(agents);
+    } catch {
+      setFleetAgents([]);
+    } finally {
+      setLoadingFleet(false);
+    }
+  }, []);
+
+  const handleDropdownOpen = () => {
+    const next = !showMenu;
+    setShowMenu(next);
+    if (next) loadFleet();
+  };
 
   const toggleTheme = () => {
     const next = !isDark;
@@ -35,7 +72,21 @@ export default function TitleBar() {
     }
   };
 
-  const switchAgent = async () => {
+  const switchToAgent = async (agent: FleetAgentInfo) => {
+    if (fleetMode) {
+      // Fleet mode: instant switch via context, no reload
+      setActiveAgent(agent.name);
+      setAgentName(agent.name);
+      setShowMenu(false);
+    } else {
+      // Single-agent mode: set root + reload (legacy behavior)
+      const kb = (window as any).kyberbot;
+      await kb.config.setAgentRoot(agent.root);
+      window.location.reload();
+    }
+  };
+
+  const browseAgent = async () => {
     const kb = (window as any).kyberbot;
     const result = await kb.config.selectAgentRoot();
     if (result?.hasIdentity) window.location.reload();
@@ -46,6 +97,21 @@ export default function TitleBar() {
   const createNewAgent = () => {
     (window as any).kyberbot.config.setAgentRoot('').then(() => window.location.reload());
     setShowMenu(false);
+  };
+
+  const menuItemStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    width: '100%',
+    textAlign: 'left',
+    padding: '6px 12px',
+    fontSize: '11px',
+    fontFamily: 'var(--font-mono)',
+    color: 'var(--fg-secondary)',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
   };
 
   return (
@@ -67,7 +133,7 @@ export default function TitleBar() {
       {/* Center: Agent name dropdown */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <button
-          onClick={() => setShowMenu(!showMenu)}
+          onClick={handleDropdownOpen}
           style={{
             display: 'flex', alignItems: 'center', gap: '4px',
             WebkitAppRegion: 'no-drag' as any,
@@ -104,9 +170,73 @@ export default function TitleBar() {
       {showMenu && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowMenu(false)} />
-          <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 50, border: '1px solid var(--border-color)', background: 'var(--bg-elevated)', padding: '4px 0', minWidth: '200px', WebkitAppRegion: 'no-drag' as any }}>
-            <button onClick={switchAgent} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 12px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)', background: 'transparent', border: 'none', cursor: 'pointer' }} onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>Switch Agent...</button>
-            <button onClick={createNewAgent} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 12px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald)', background: 'transparent', border: 'none', cursor: 'pointer' }} onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>+ Create New Agent</button>
+          <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 50, border: '1px solid var(--border-color)', background: 'var(--bg-elevated)', padding: '4px 0', minWidth: '240px', WebkitAppRegion: 'no-drag' as any }}>
+
+            {/* Fleet agents */}
+            {loadingFleet && (
+              <div style={{ ...menuItemStyle, color: 'var(--fg-muted)', cursor: 'default' }}>
+                Loading...
+              </div>
+            )}
+            {!loadingFleet && fleetAgents.length > 0 && fleetAgents.map((agent) => (
+              <button
+                key={agent.root}
+                onClick={() => switchToAgent(agent)}
+                style={menuItemStyle}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                <Circle
+                  size={6}
+                  fill={agent.running ? '#10b981' : '#6b7280'}
+                  stroke="none"
+                  style={{ flexShrink: 0 }}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', overflow: 'hidden' }}>
+                  <span style={{
+                    color: (fleetMode ? agent.name === activeAgent : agent.root === agentRoot)
+                      ? 'var(--accent-emerald)' : 'var(--fg-secondary)',
+                    fontWeight: (fleetMode ? agent.name === activeAgent : agent.root === agentRoot)
+                      ? 600 : 400,
+                  }}>
+                    {agent.name}
+                  </span>
+                  <span style={{ fontSize: '9px', color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {agent.root.replace(/^\/Users\/[^/]+\//, '~/')}
+                  </span>
+                </div>
+              </button>
+            ))}
+            {!loadingFleet && fleetAgents.length === 0 && (
+              <div style={{ ...menuItemStyle, color: 'var(--fg-muted)', cursor: 'default', fontStyle: 'italic' }}>
+                No agents registered
+              </div>
+            )}
+
+            {/* Separator */}
+            <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }} />
+
+            {/* Browse */}
+            <button
+              onClick={browseAgent}
+              style={menuItemStyle}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <FolderOpen size={11} style={{ flexShrink: 0, opacity: 0.6 }} />
+              Browse...
+            </button>
+
+            {/* Create new */}
+            <button
+              onClick={createNewAgent}
+              style={{ ...menuItemStyle, color: 'var(--accent-emerald)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              <Plus size={11} style={{ flexShrink: 0 }} />
+              Create New Agent
+            </button>
           </div>
         </>
       )}
