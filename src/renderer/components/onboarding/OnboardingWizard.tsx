@@ -297,7 +297,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
               <p style={{ fontSize: '13px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, marginBottom: '8px' }}>
                 Review your configuration and launch your agent.
               </p>
-              {([
+              {[
                 ['Agent', data.agentName],
                 ['Role', data.agentDescription],
                 ['Directory', data.agentRoot],
@@ -309,10 +309,10 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                 ['Telegram', data.telegramToken ? 'Configured' : 'Skipped'],
                 ['WhatsApp', data.whatsappEnabled ? 'Enabled' : 'Skipped'],
                 ['Backup', data.backupUrl || 'Skipped'],
-              ].map(([label, value]) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{label}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)' }}>{value || '—'}</span>
+              ].map((row, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{row[0]}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)' }}>{row[1] || '—'}</span>
                 </div>
               ))}
               {error && <div style={{ padding: '8px', border: '1px solid var(--status-error)', color: 'var(--status-error)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{error}</div>}
