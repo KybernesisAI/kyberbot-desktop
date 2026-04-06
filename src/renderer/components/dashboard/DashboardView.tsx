@@ -599,7 +599,7 @@ export default function DashboardView() {
             </div>
             <div className="p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
               <div className="text-[9px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Channels</div>
-              <div className="text-[13px]" style={{ fontFamily: 'var(--font-mono)' }}>{health.channels.filter(c => c.connected).length}/{health.channels.length}</div>
+              <div className="text-[13px]" style={{ fontFamily: 'var(--font-mono)' }}>{(health.channels || []).filter(c => c.connected).length}/{(health.channels || []).length}</div>
             </div>
             <div className="p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
               <div className="text-[9px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>PID</div>
