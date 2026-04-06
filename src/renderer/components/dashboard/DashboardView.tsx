@@ -472,15 +472,34 @@ export default function DashboardView() {
 
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflowY: "auto", padding: 16, background: "var(--bg-primary)" }}>
-      {/* Fleet mode info — visible when 2+ agents registered but not running */}
-      {agents.length >= 2 && !isRunning && !isStarting && (
+      {/* Fleet banner — visible when 2+ agents registered but fleet not running */}
+      {agents.length >= 2 && !fleetStatus && !isStarting && (
         <div className="mb-4 p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: '11px',
-            color: 'var(--fg-secondary)',
-          }}>
-            {agents.length} agents registered — use Start to launch fleet
-          </span>
+          <div className="flex items-center justify-between">
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '11px',
+              color: 'var(--fg-secondary)',
+            }}>
+              {agents.length} agents registered
+            </span>
+            <button
+              onClick={async () => {
+                await kb?.fleet.start(agents.map((a: any) => a.name));
+              }}
+              disabled={isRunning || isStarting || isStopping}
+              className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                borderColor: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-cyan)',
+                color: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-cyan)',
+                background: 'transparent',
+                cursor: isRunning || isStarting || isStopping ? 'default' : 'pointer',
+                opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
+              }}
+            >
+              Start Fleet
+            </button>
+          </div>
         </div>
       )}
 
@@ -508,7 +527,7 @@ export default function DashboardView() {
           }}>
             {cliStatus}
           </span>
-          {/* Start single agent */}
+          {/* Start current agent only */}
           <button
             onClick={async () => {
               await kb?.services.start();
@@ -524,28 +543,8 @@ export default function DashboardView() {
               opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
             }}
           >
-            Start
+            {`Start ${activeAgent || 'Agent'}`}
           </button>
-          {/* Start fleet (only when 2+ agents registered) */}
-          {agents.length >= 2 && (
-            <button
-              onClick={async () => {
-                await kb?.fleet.start(agents.map((a: any) => a.name));
-              }}
-              disabled={isRunning || isStarting || isStopping}
-              className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                borderColor: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-cyan)',
-                color: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-cyan)',
-                background: 'transparent',
-                cursor: isRunning || isStarting || isStopping ? 'default' : 'pointer',
-                opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
-              }}
-            >
-              Start Fleet
-            </button>
-          )}
           <button
             onClick={async () => {
               if (fleetMode && fleetStatus) {
@@ -567,7 +566,7 @@ export default function DashboardView() {
               opacity: isRunning && !isStopping ? 1 : 0.3,
             }}
           >
-            {isStopping ? 'Stopping...' : (fleetMode && fleetStatus ? 'Stop Fleet' : 'Stop')}
+            {isStopping ? 'Stopping...' : (fleetMode && fleetStatus ? 'Stop Fleet' : `Stop ${activeAgent || 'Agent'}`)}
           </button>
         </div>
       </div>
