@@ -51,13 +51,14 @@ export default function SessionList({ currentSessionId, onSelectSession, onNewSe
       }
     } catch {}
     setLoading(false);
-  }, [serverUrl, apiToken]);
+  }, [serverUrl, apiToken, serverReady]);
 
   useEffect(() => {
+    if (!serverReady) return;
     fetchSessions();
     const timer = setInterval(fetchSessions, 60_000);
     return () => clearInterval(timer);
-  }, [fetchSessions]);
+  }, [fetchSessions, serverReady]);
 
   const withMessages = sessions.filter(s => s.message_count > 0);
 

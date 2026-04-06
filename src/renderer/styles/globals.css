@@ -15,13 +15,9 @@ body {
   font-size: var(--text-base);
   background: var(--bg-primary);
   color: var(--fg-primary);
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-input, textarea, pre, code, [contenteditable] {
-  user-select: text !important;
-  -webkit-user-select: text !important;
+  /* Text selection enabled everywhere except the title bar drag region */
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .section-title {
