@@ -484,6 +484,35 @@ export default function DashboardView() {
 
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflowY: "auto", padding: 16, background: "var(--bg-primary)" }}>
+      {/* Fleet Controls — visible when 2+ agents registered but fleet not running */}
+      {agents.length >= 2 && !fleetStatus && !isRunning && !isStarting && (
+        <div className="mb-4 p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+          <div className="flex items-center justify-between">
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '11px',
+              color: 'var(--fg-secondary)',
+            }}>
+              {agents.length} agents registered — fleet mode available
+            </span>
+            <button
+              onClick={async () => {
+                await kb?.fleet.start(agents.map((a: any) => a.name));
+              }}
+              className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                borderColor: 'var(--accent-emerald)',
+                color: 'var(--accent-emerald)',
+                background: 'transparent',
+                cursor: 'pointer',
+              }}
+            >
+              Start Fleet
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Fleet Overview (only in fleet mode) */}
       {fleetMode && fleetStatus && (
         <FleetOverview
@@ -515,7 +544,15 @@ export default function DashboardView() {
             {cliStatus}
           </span>
           <button
-            onClick={() => kb?.services.start()}
+            onClick={async () => {
+              if (agents.length >= 2) {
+                // Fleet mode: start all registered agents
+                await kb?.fleet.start(agents.map((a: any) => a.name));
+              } else {
+                // Single agent mode
+                await kb?.services.start();
+              }
+            }}
             disabled={isRunning || isStarting || isStopping}
             className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
             style={{
@@ -527,10 +564,18 @@ export default function DashboardView() {
               opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
             }}
           >
-            Start
+            {agents.length >= 2 ? 'Start Fleet' : 'Start'}
           </button>
           <button
-            onClick={() => kb?.services.stop()}
+            onClick={async () => {
+              if (fleetMode && fleetStatus) {
+                // Fleet mode: stop the entire fleet
+                await kb?.fleet.stop();
+              } else {
+                // Single agent mode
+                await kb?.services.stop();
+              }
+            }}
             disabled={!isRunning || isStopping}
             className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
             style={{
@@ -542,7 +587,7 @@ export default function DashboardView() {
               opacity: isRunning && !isStopping ? 1 : 0.3,
             }}
           >
-            {isStopping ? 'Stopping...' : 'Stop'}
+            {isStopping ? 'Stopping...' : (fleetMode && fleetStatus ? 'Stop Fleet' : 'Stop')}
           </button>
         </div>
       </div>

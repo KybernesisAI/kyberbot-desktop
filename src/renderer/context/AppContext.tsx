@@ -89,7 +89,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [fleetStatus, setFleetStatus] = useState<FleetStatusData | null>(null);
 
   // Compute effective serverUrl based on fleet mode
-  const serverUrl = fleetMode && activeAgent
+  // Only route through /agent/{name} when fleet server is actually running (fleetStatus !== null)
+  const serverUrl = fleetMode && activeAgent && fleetStatus
     ? `${baseServerUrl}/agent/${encodeURIComponent(activeAgent)}`
     : baseServerUrl;
 
