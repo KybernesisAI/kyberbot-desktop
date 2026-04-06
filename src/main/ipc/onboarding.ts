@@ -201,32 +201,50 @@ export function registerOnboardingHandlers(store: AppStore): void {
 function findTemplateDir(): string | null {
   const home = process.env.HOME || '';
 
-  // Check nvm installs (most common)
+  // The template/ dir lives at the MONOREPO ROOT, not inside packages/cli.
+  // When installed via npm link or symlink, the CLI points back to the monorepo.
+  // When published to npm, template/ needs to be included in the package.
+
+  // Strategy: find the CLI package, then look for template/ relative to it
+  const cliPaths: string[] = [];
+
+  // Check nvm installs
   try {
     const nvmDir = join(home, '.nvm/versions/node');
-    const versions = readdirSync(nvmDir).sort().reverse(); // newest first
+    const versions = readdirSync(nvmDir).sort().reverse();
     for (const v of versions) {
-      const templateDir = join(nvmDir, v, 'lib/node_modules/@kyberbot/cli/template');
-      if (existsSync(join(templateDir, 'skills'))) return templateDir;
+      cliPaths.push(join(nvmDir, v, 'lib/node_modules/@kyberbot/cli'));
     }
   } catch {}
 
-  // Check global npm install
-  const globalPaths = [
-    '/usr/local/lib/node_modules/@kyberbot/cli/template',
-    '/opt/homebrew/lib/node_modules/@kyberbot/cli/template',
-    join(home, '.npm-global/lib/node_modules/@kyberbot/cli/template'),
-  ];
-  for (const p of globalPaths) {
-    if (existsSync(join(p, 'skills'))) return p;
-  }
+  // Check global paths
+  cliPaths.push(
+    '/usr/local/lib/node_modules/@kyberbot/cli',
+    '/opt/homebrew/lib/node_modules/@kyberbot/cli',
+    join(home, '.npm-global/lib/node_modules/@kyberbot/cli'),
+  );
 
   // Try npm root -g
   try {
     const npmRoot = execSync('npm root -g', { encoding: 'utf-8', timeout: 5000 }).trim();
-    const p = join(npmRoot, '@kyberbot/cli/template');
-    if (existsSync(join(p, 'skills'))) return p;
+    cliPaths.push(join(npmRoot, '@kyberbot/cli'));
   } catch {}
+
+  for (const cliPath of cliPaths) {
+    if (!existsSync(cliPath)) continue;
+
+    // Resolve symlinks to find the real path
+    const realPath = require('fs').realpathSync(cliPath);
+
+    // Check for template/ inside the CLI package (published version)
+    const inPackage = join(realPath, 'template');
+    if (existsSync(join(inPackage, 'skills'))) return inPackage;
+
+    // Check for template/ at the monorepo root (linked/dev version)
+    // CLI is at <monorepo>/packages/cli, template is at <monorepo>/template
+    const monorepoTemplate = join(realPath, '..', '..', 'template');
+    if (existsSync(join(monorepoTemplate, 'skills'))) return monorepoTemplate;
+  }
 
   return null;
 }

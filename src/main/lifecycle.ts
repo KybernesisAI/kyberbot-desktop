@@ -127,12 +127,25 @@ export class LifecycleManager extends EventEmitter {
     const logPath = join(logDir, 'desktop-cli.log');
     this.logStream = createWriteStream(logPath, { flags: 'a' });
 
+    // Load the agent's .env so both the spawn and IPC handlers use the same token
+    const agentEnv: Record<string, string> = {};
+    try {
+      const envContent = require('fs').readFileSync(join(agentRoot, '.env'), 'utf-8');
+      for (const line of envContent.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx > 0) agentEnv[trimmed.slice(0, eqIdx)] = trimmed.slice(eqIdx + 1);
+      }
+    } catch {}
+
     // Spawn kyberbot directly (it has its own shebang with node + max-old-space-size)
     const fullPath = this.getFullPath();
     this.process = spawn(cliPath, ['run'], {
       cwd: agentRoot,
       env: {
         ...process.env,
+        ...agentEnv, // Agent's .env vars (including KYBERBOT_API_TOKEN)
         KYBERBOT_ROOT: agentRoot,
         KYBERBOT_CHILD: '1', // Disables CLI's built-in watchdog (run.ts:64)
         NODE_ENV: 'production',
