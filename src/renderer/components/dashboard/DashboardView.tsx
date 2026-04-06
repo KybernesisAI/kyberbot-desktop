@@ -445,14 +445,14 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent }: {
 }
 
 export default function DashboardView() {
-  const { health, effectiveStatus, fleetMode, fleetStatus, agents, activeAgent, setActiveAgent, agentRoot, runningAgentRoot } = useApp();
+  const { health, cliStatus, fleetMode, fleetStatus, agents, activeAgent, setActiveAgent, agentRoot, runningAgentRoot } = useApp();
   const kb = (window as any).kyberbot;
   const [logs, setLogs] = useState<string[]>([]);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  const isRunning = effectiveStatus === 'running';
-  const isStopping = effectiveStatus === 'stopping';
-  const isStarting = effectiveStatus === 'starting';
+  const isRunning = cliStatus === 'running';
+  const isStopping = cliStatus === 'stopping';
+  const isStarting = cliStatus === 'starting';
 
   const services = health?.services ?? SERVICE_NAMES.map(name => ({ name, status: isRunning ? 'unknown' : 'stopped' }));
   const ansiConverter = useMemo(() => new AnsiToHtml({ fg: '#a1a1aa', bg: 'transparent', newline: false, escapeXML: true }), []);
@@ -529,7 +529,7 @@ export default function DashboardView() {
             fontFamily: 'var(--font-mono)',
             color: isRunning ? 'var(--status-success)' : isStopping ? 'var(--status-warning)' : isStarting ? 'var(--status-warning)' : 'var(--fg-muted)',
           }}>
-            {effectiveStatus}
+            {cliStatus}
           </span>
           {/* Start current agent only */}
           <button

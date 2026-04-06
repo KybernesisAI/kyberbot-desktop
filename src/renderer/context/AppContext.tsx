@@ -1,12 +1,8 @@
 /**
  * App-wide context: multi-agent aware.
  *
- * Key concept: `runningAgentRoot` tracks which agent the lifecycle actually started.
- * When viewing a different agent, the dashboard shows "stopped" even though the
- * lifecycle process is alive — because it's not THIS agent's process.
- *
- * In fleet mode (`runningAgentRoot === '__fleet__'`), all agents share one server
- * and switching is instant with /agent/{name} routing.
+ * Health and status are polled per-agent via IPC (not event-driven).
+ * This eliminates flickering from cross-agent event interference.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
@@ -42,8 +38,7 @@ interface AppContextValue {
   serverUrl: string;
   baseServerUrl: string;
   health: HealthData | null;
-  cliStatus: string;            // actual lifecycle status
-  effectiveStatus: string;      // status for the VIEWED agent (stopped if not this agent's process)
+  cliStatus: string;
   isReady: boolean;
   serverReady: boolean;
 
@@ -57,21 +52,11 @@ interface AppContextValue {
 }
 
 const AppContext = createContext<AppContextValue>({
-  agentRoot: null,
-  apiToken: null,
-  serverUrl: 'http://localhost:3456',
-  baseServerUrl: 'http://localhost:3456',
-  health: null,
-  cliStatus: 'stopped',
-  effectiveStatus: 'stopped',
-  isReady: false,
-  serverReady: false,
-  fleetMode: false,
-  agents: [],
-  activeAgent: null,
-  setActiveAgent: () => {},
-  fleetStatus: null,
-  runningAgentRoot: null,
+  agentRoot: null, apiToken: null,
+  serverUrl: 'http://localhost:3456', baseServerUrl: 'http://localhost:3456',
+  health: null, cliStatus: 'stopped', isReady: false, serverReady: false,
+  fleetMode: false, agents: [], activeAgent: null,
+  setActiveAgent: () => {}, fleetStatus: null, runningAgentRoot: null,
 });
 
 export function useApp(): AppContextValue {
@@ -87,46 +72,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [serverReady, setServerReady] = useState(false);
 
-  // Multi-agent state
   const [agents, setAgents] = useState<FleetAgentInfo[]>([]);
   const [activeAgent, setActiveAgentState] = useState<string | null>(null);
   const [fleetStatus, setFleetStatus] = useState<FleetStatusData | null>(null);
   const [runningAgentRoot, setRunningAgentRoot] = useState<string | null>(null);
 
-  // Ref to track current agentRoot for event handlers (closures capture stale state)
-  const agentRootRef = useRef<string | null>(null);
-  useEffect(() => { agentRootRef.current = agentRoot; }, [agentRoot]);
-
-  // Fleet mode = fleet server confirmed running
   const fleetMode = fleetStatus !== null;
 
-  // Is the currently viewed agent the one that's actually running?
-  const isThisAgentRunning = fleetMode
-    ? true  // fleet serves all agents
-    : (runningAgentRoot !== null && runningAgentRoot === agentRoot);
-
-  // Effective status for the viewed agent
-  const effectiveStatus = isThisAgentRunning ? cliStatus : 'stopped';
-
-  // Server URL: in fleet mode, route through /agent/{name}
   const serverUrl = fleetMode && activeAgent
     ? `${baseServerUrl}/agent/${encodeURIComponent(activeAgent)}`
     : baseServerUrl;
 
-  // Switch active agent — NO page reload, just context update
+  // Switch active agent — no reload
   const setActiveAgent = useCallback((name: string) => {
     const kb = (window as any).kyberbot;
     if (!kb) return;
-
     const agent = agents.find(a => a.name.toLowerCase() === name.toLowerCase());
     if (!agent) return;
 
     setActiveAgentState(name);
-
-    // Update the store so IPC reads (readIdentity, readEnv) use the right root
     kb.config.setAgentRoot(agent.root).then(() => {
       setAgentRoot(agent.root);
-      // Read this agent's server URL (might be different port)
       kb.config.getServerUrl().then((url: string) => {
         if (!fleetMode) setBaseServerUrl(url);
       });
@@ -136,6 +102,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [agents, fleetMode]);
 
+  // ── Init ──
   useEffect(() => {
     const kb = (window as any).kyberbot;
     if (!kb) return;
@@ -153,100 +120,113 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setBaseServerUrl(url);
       }
 
-      // Get lifecycle status including which agent is running
-      const statusResult = await kb.services.getStatus();
-      setCliStatus(statusResult.status);
-      setRunningAgentRoot(statusResult.runningAgentRoot || null);
-
-      // Check fleet status
+      // Check fleet
       try {
         const fleetResult = await kb.fleet.getStatus();
         if (fleetResult.fleetMode && fleetResult.fleet) {
           setFleetStatus(fleetResult.fleet);
         }
-      } catch { /* not available */ }
+      } catch {}
 
-      // Load registered agents
+      // Load agents
       try {
         const registeredAgents = await kb.fleet.list();
         setAgents(registeredAgents);
-
-        // Set active agent to current root's agent
         if (root) {
-          const currentAgent = registeredAgents.find((a: FleetAgentInfo) => a.root === root);
-          if (currentAgent) {
-            setActiveAgentState(currentAgent.name);
-          }
+          const current = registeredAgents.find((a: FleetAgentInfo) => a.root === root);
+          if (current) setActiveAgentState(current.name);
         }
-      } catch { /* not available */ }
+      } catch {}
 
       setIsReady(true);
     };
     init();
+  }, []);
 
-    // Health updates — only apply if from the currently viewed agent
-    const unsubHealth = kb.services.onHealthUpdate((h: HealthData, root?: string) => {
-      // Skip health updates from other agents
-      if (root && root !== agentRootRef.current && root !== '__fleet__') return;
+  // ── Poll viewed agent's state every 3 seconds ──
+  useEffect(() => {
+    const kb = (window as any).kyberbot;
+    if (!kb || !agentRoot || !isReady) return;
 
-      setHealth(h);
-      if (h.status !== 'offline') {
-        if (!serverReady) {
-          kb.config.getApiToken().then((token: string | null) => {
-            if (token) setApiToken(token);
-            setServerReady(true);
-          });
+    const poll = async () => {
+      try {
+        const state = await kb.services.getAgentState(agentRoot);
+        setCliStatus(state.status || 'stopped');
+        setHealth(state.health || null);
+        setServerReady(state.isRunning || false);
+
+        // If this agent just became running, re-read token
+        if (state.isRunning && !serverReady) {
+          const token = await kb.config.getApiToken();
+          if (token) setApiToken(token);
         }
+      } catch {
+        setCliStatus('stopped');
+        setHealth(null);
+        setServerReady(false);
       }
-    });
+    };
 
-    // Status changes — only update cliStatus if from the viewed agent or fleet
-    const unsubStatus = kb.services.onStatusChange((status: string, root?: string | null) => {
-      // Update cliStatus only for the viewed agent or fleet-wide events
-      if (!root || root === agentRootRef.current || root === '__fleet__') {
-        setCliStatus(status);
-      }
-      if (root !== undefined) setRunningAgentRoot(root);
-      if (status === 'stopped' || status === 'crashed') {
-        if (root === '__fleet__' || !root) {
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [agentRoot, isReady]);
+
+  // ── Poll fleet status (when in fleet mode) ──
+  useEffect(() => {
+    const kb = (window as any).kyberbot;
+    if (!kb || !isReady) return;
+
+    const poll = async () => {
+      try {
+        const result = await kb.fleet.getStatus();
+        if (result.fleetMode && result.fleet) {
+          setFleetStatus(result.fleet);
+        } else {
           setFleetStatus(null);
         }
+      } catch {
+        setFleetStatus(null);
       }
-    });
-
-    // Per-agent status changes — update running roots
-    const unsubAgentStatus = kb.services.onAgentStatusChange?.((root: string, status: string) => {
-      // Update agent running states
-      setAgents(prev => prev.map(a =>
-        a.root === root ? { ...a, running: status === 'running' || status === 'starting' } : a
-      ));
-    }) ?? (() => {});
-
-    // Fleet status updates
-    const unsubFleet = kb.fleet?.onStatusUpdate?.((fleet: FleetStatusData) => {
-      setFleetStatus(fleet);
-      setAgents(prev => prev.map(agent => {
-        const fleetAgent = fleet.agents.find(
-          fa => fa.name.toLowerCase() === agent.name.toLowerCase()
-        );
-        return fleetAgent
-          ? { ...agent, running: fleetAgent.status === 'running' }
-          : agent;
-      }));
-    }) ?? (() => {});
-
-    return () => {
-      unsubHealth();
-      unsubStatus();
-      unsubAgentStatus();
-      unsubFleet();
     };
-  }, []);
+
+    // Only poll if we think fleet might be running
+    if (fleetStatus) {
+      const interval = setInterval(poll, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [isReady, fleetStatus !== null]);
+
+  // ── Update agent running indicators (for dropdown) ──
+  useEffect(() => {
+    const kb = (window as any).kyberbot;
+    if (!kb || !isReady || agents.length === 0) return;
+
+    const updateRunning = async () => {
+      const updated = await Promise.all(agents.map(async (a) => {
+        try {
+          const state = await kb.services.getAgentState(a.root);
+          return { ...a, running: state.isRunning };
+        } catch {
+          return { ...a, running: false };
+        }
+      }));
+      setAgents(updated);
+
+      // Find any running agent root for the dropdown indicator
+      const anyRunning = updated.find(a => a.running);
+      setRunningAgentRoot(anyRunning?.root || null);
+    };
+
+    updateRunning();
+    const interval = setInterval(updateRunning, 5000);
+    return () => clearInterval(interval);
+  }, [isReady, agents.length]);
 
   return (
     <AppContext.Provider value={{
       agentRoot, apiToken, serverUrl, baseServerUrl, health,
-      cliStatus, effectiveStatus, isReady, serverReady,
+      cliStatus, isReady, serverReady,
       fleetMode, agents, activeAgent, setActiveAgent, fleetStatus,
       runningAgentRoot,
     }}>

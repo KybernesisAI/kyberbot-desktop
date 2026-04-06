@@ -24,6 +24,8 @@ const api = {
     start: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SERVICES_START),
     stop: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SERVICES_STOP),
     getStatus: (): Promise<any> => ipcRenderer.invoke(IPC.SERVICES_STATUS),
+    getAgentState: (root: string): Promise<{ status: string; health: any; isRunning: boolean }> =>
+      ipcRenderer.invoke('services:getAgentState', root),
     onHealthUpdate: (callback: (health: HealthData, root?: string) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, health: HealthData, root?: string) => callback(health, root);
       ipcRenderer.on(IPC.SERVICES_HEALTH_UPDATE, handler);

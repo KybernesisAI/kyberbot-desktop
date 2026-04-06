@@ -25,11 +25,20 @@ export function registerServiceHandlers(
   ipcMain.handle(IPC.SERVICES_STATUS, () => {
     const root = lifecycle.getAgentRoot();
     return {
-      status: lifecycle.status,
-      health: lifecycle.getHealth(),
+      status: root ? lifecycle.getAgentStatus(root) : 'stopped',
+      health: root ? lifecycle.getAgentHealth(root) : null,
       runningAgentRoot: lifecycle.getRunningAgentRoot(),
       runningRoots: lifecycle.getRunningAgentRoots(),
       isThisAgentRunning: root ? lifecycle.isAgentRunning(root) : false,
+    };
+  });
+
+  // Per-agent state query — the renderer polls this for the viewed agent
+  ipcMain.handle('services:getAgentState', (_event, root: string) => {
+    return {
+      status: lifecycle.getAgentStatus(root),
+      health: lifecycle.getAgentHealth(root),
+      isRunning: lifecycle.isAgentRunning(root),
     };
   });
 

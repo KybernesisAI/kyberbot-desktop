@@ -88,6 +88,11 @@ export class LifecycleManager extends EventEmitter {
     return agent?.health || null;
   }
 
+  /** Get health for a specific agent root */
+  getAgentHealth(root: string): HealthData | null {
+    return this.agents.get(root)?.health || null;
+  }
+
   getFleetStatus(): FleetStatus | null { return this.lastFleetStatus; }
 
   isRunning(): boolean {
