@@ -457,16 +457,16 @@ export default function DashboardView() {
   const services = health?.services ?? SERVICE_NAMES.map(name => ({ name, status: isRunning ? 'unknown' : 'stopped' }));
   const ansiConverter = useMemo(() => new AnsiToHtml({ fg: '#a1a1aa', bg: 'transparent', newline: false, escapeXML: true }), []);
 
-  // Load logs for the viewed agent and subscribe to updates
+  // Load logs — in fleet mode all agents share one log stream ('__fleet__')
+  const logKey = fleetMode ? '__fleet__' : agentRoot;
   useEffect(() => {
-    setLogs([...getLogBuffer(agentRoot)]);
+    setLogs([...getLogBuffer(logKey)]);
     return subscribeToLogs((root, lines) => {
-      // Only update if these logs are for the agent we're currently viewing
-      if (root === agentRoot) {
+      if (root === logKey) {
         setLogs([...lines]);
       }
     });
-  }, [agentRoot]);
+  }, [logKey]);
 
   // Auto-scroll only the log container
   useEffect(() => {

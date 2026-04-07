@@ -160,20 +160,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setCliStatus('running');
           setServerReady(true);
 
-          // Health comes from the fleet server for the viewed agent
-          try {
-            const url = `${baseServerUrl}/agent/${activeAgent}/health`;
-            const token = apiToken;
-            const headers: Record<string, string> = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-            const res = await fetch(url, { headers, signal: AbortSignal.timeout(3000) });
-            if (res.ok) {
-              const healthData = await res.json();
-              setHealth(healthData);
-            }
-          } catch {
-            // Fleet running but can't reach agent-specific health — use fleet data
-            setHealth(null);
+          // Synthesize health from fleet data for the viewed agent
+          const fleetAgent = fleetResult.fleet.agents?.find(
+            (a: any) => a.name.toLowerCase() === activeAgent?.toLowerCase()
+          );
+          if (fleetAgent) {
+            setHealth({
+              status: fleetAgent.status === 'running' ? 'ok' : 'degraded',
+              timestamp: new Date().toISOString(),
+              uptime: fleetAgent.uptime || '0s',
+              channels: fleetAgent.channels || [],
+              services: fleetAgent.services || [],
+              errors: 0, memory: {}, pid: fleetResult.fleet.pid || 0, node_version: '',
+            } as any);
           }
 
           // Update agent running indicators from fleet data
