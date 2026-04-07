@@ -57,20 +57,39 @@ export default function ChatView() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const authHeaders = useCallback((): Record<string, string> => {
-    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    const h: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
     if (apiToken) h['Authorization'] = `Bearer ${apiToken}`;
     return h;
   }, [apiToken]);
 
   // Load agent name and model from identity (re-read on agent switch)
+  // For remote agents, fetch from the remote server's API
   useEffect(() => {
-    const kb = (window as any).kyberbot;
-    if (!kb) return;
-    kb.config.readIdentity().then((id: any) => {
+    const loadIdentity = async () => {
+      try {
+        // Try remote API first (works for both local fleet and remote agents)
+        const res = await fetch(`${serverUrl}/api/web/identity`, {
+          headers: authHeaders(),
+        });
+        if (res.ok) {
+          const id = await res.json();
+          if (id?.agent_name) setAgentName(id.agent_name);
+          if (id?.claude?.model) setClaudeModel(id.claude.model);
+          return;
+        }
+      } catch {}
+      // Fall back to local IPC
+      const kb = (window as any).kyberbot;
+      if (!kb) return;
+      const id = await kb.config.readIdentity();
       if (id?.agent_name) setAgentName(id.agent_name);
       if (id?.claude?.model) setClaudeModel(id.claude.model);
-    });
-  }, [activeAgent]);
+    };
+    loadIdentity();
+  }, [activeAgent, serverUrl]);
 
   // Load most recent session on mount and on agent switch
   useEffect(() => {

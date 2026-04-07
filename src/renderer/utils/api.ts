@@ -1,7 +1,17 @@
 /**
  * HTTP client for management API and brain API.
- * Reads token and server URL from AppContext.
+ * Adds ngrok-skip-browser-warning header for remote agent compatibility.
  */
+
+function buildHeaders(token: string | null, extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true', // bypass ngrok free tier interstitial
+    ...(extra || {}),
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
 
 export async function manageFetch<T>(
   serverUrl: string,
@@ -9,11 +19,7 @@ export async function manageFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> || {}),
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const headers = buildHeaders(token, options.headers as Record<string, string>);
 
   const res = await fetch(`${serverUrl}/api/web/manage${path}`, {
     ...options,
@@ -34,11 +40,7 @@ export async function brainFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> || {}),
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const headers = buildHeaders(token, options.headers as Record<string, string>);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);

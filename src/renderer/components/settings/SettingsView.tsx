@@ -17,11 +17,32 @@ export default function SettingsView() {
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
 
   // Re-read identity and env when agent switches
+  // For remote agents, fetch from remote API
   useEffect(() => {
-    if (!kb) return;
-    kb.config.readIdentity().then((id: IdentityConfig | null) => setIdentity(id));
-    kb.config.readEnv().then((e: EnvConfig) => setEnv(e));
-  }, [activeAgent]);
+    const loadConfig = async () => {
+      try {
+        // Try remote API first
+        const headers: Record<string, string> = { 'ngrok-skip-browser-warning': 'true' };
+        if (apiToken) headers['Authorization'] = `Bearer ${apiToken}`;
+        const res = await fetch(`${serverUrl}/api/web/identity`, { headers });
+        if (res.ok) {
+          const id = await res.json();
+          setIdentity(id);
+          return;
+        }
+      } catch {}
+      // Fall back to local IPC
+      if (kb) {
+        kb.config.readIdentity().then((id: IdentityConfig | null) => setIdentity(id));
+      }
+    };
+    const loadEnv = async () => {
+      // Env is local-only (can't read .env from remote)
+      if (kb) kb.config.readEnv().then((e: EnvConfig) => setEnv(e));
+    };
+    loadConfig();
+    loadEnv();
+  }, [activeAgent, serverUrl]);
 
   useEffect(() => {
     const fetchTunnel = async () => {

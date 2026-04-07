@@ -173,7 +173,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // If viewing a remote agent, poll its health directly
         if (isRemoteAgent && currentAgent?.remoteUrl) {
           try {
-            const headers: Record<string, string> = {};
+            const headers: Record<string, string> = { 'ngrok-skip-browser-warning': 'true' };
             if (currentAgent.remoteToken) headers['Authorization'] = `Bearer ${currentAgent.remoteToken}`;
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 3000);
@@ -308,7 +308,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               try {
                 const ctrl = new AbortController();
                 const t = setTimeout(() => ctrl.abort(), 2000);
-                const hdrs: Record<string, string> = {};
+                const hdrs: Record<string, string> = { 'ngrok-skip-browser-warning': 'true' };
                 if (a.remoteToken) hdrs['Authorization'] = `Bearer ${a.remoteToken}`;
                 const r = await fetch(`${a.remoteUrl}/health`, { signal: ctrl.signal, headers: hdrs });
                 clearTimeout(t);

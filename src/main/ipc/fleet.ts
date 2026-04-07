@@ -118,7 +118,9 @@ export function registerFleetHandlers(
         try {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 3000);
-          const res = await fetch(`${entry.remoteUrl}/health`, { signal: controller.signal });
+          const headers: Record<string, string> = { 'ngrok-skip-browser-warning': 'true' };
+          if (entry.remoteToken) headers['Authorization'] = `Bearer ${entry.remoteToken}`;
+          const res = await fetch(`${entry.remoteUrl}/health`, { signal: controller.signal, headers });
           clearTimeout(timeout);
           running = res.ok;
         } catch {
