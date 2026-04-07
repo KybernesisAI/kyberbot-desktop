@@ -160,6 +160,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setCliStatus('running');
           setServerReady(true);
 
+          // Ensure we have a valid token
+          if (!apiToken) {
+            const token = await kb.config.getApiToken();
+            if (token) setApiToken(token);
+          }
+
           // Synthesize health from fleet data for the viewed agent
           const fleetAgent = fleetResult.fleet.agents?.find(
             (a: any) => a.name.toLowerCase() === activeAgent?.toLowerCase()
