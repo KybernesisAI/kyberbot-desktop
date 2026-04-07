@@ -1,6 +1,6 @@
 {
   "name": "kyberbot-desktop",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "KyberBot Desktop — Electron control panel for your personal AI agent",
   "main": "dist-electron/main/index.cjs",
   "type": "module",
