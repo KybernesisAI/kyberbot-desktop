@@ -87,15 +87,19 @@ export default function BusView() {
 
   const agentNames = useMemo(() => {
     const set = new Set<string>();
-    messages.forEach(m => { set.add(m.from); if (m.to !== '*') set.add(m.to); });
+    messages.forEach(m => {
+      set.add(m.from.toLowerCase());
+      if (m.to !== '*') set.add(m.to.toLowerCase());
+    });
     return [...set].sort();
   }, [messages]);
 
-  // Filter messages
+  // Filter messages (case-insensitive)
   const filtered = useMemo(() => {
     let result = messages;
     if (filterAgent) {
-      result = result.filter(m => m.from === filterAgent || m.to === filterAgent);
+      const fa = filterAgent.toLowerCase();
+      result = result.filter(m => m.from.toLowerCase() === fa || m.to.toLowerCase() === fa);
     }
     if (filterTopic) {
       result = result.filter(m => m.topic === filterTopic);
