@@ -143,22 +143,79 @@ export function AppProvider({ children }: { children: ReactNode }) {
     init();
   }, []);
 
-  // ── Poll viewed agent's state every 3 seconds ──
+  // ── Master poll: agent state + fleet status, every 3 seconds ──
   useEffect(() => {
     const kb = (window as any).kyberbot;
     if (!kb || !agentRoot || !isReady) return;
 
     const poll = async () => {
       try {
+        // 1. Check fleet status first
+        const fleetResult = await kb.fleet.getStatus();
+        const isFleet = fleetResult.fleetMode && fleetResult.fleet;
+
+        if (isFleet) {
+          // Fleet mode — status comes from fleet, not individual agents
+          setFleetStatus(fleetResult.fleet);
+          setCliStatus('running');
+          setServerReady(true);
+
+          // Health comes from the fleet server for the viewed agent
+          try {
+            const url = `${baseServerUrl}/agent/${activeAgent}/health`;
+            const token = apiToken;
+            const headers: Record<string, string> = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const res = await fetch(url, { headers, signal: AbortSignal.timeout(3000) });
+            if (res.ok) {
+              const healthData = await res.json();
+              setHealth(healthData);
+            }
+          } catch {
+            // Fleet running but can't reach agent-specific health — use fleet data
+            setHealth(null);
+          }
+
+          // Update agent running indicators from fleet data
+          if (fleetResult.fleet?.agents) {
+            setAgents(prev => prev.map(a => {
+              const fa = fleetResult.fleet.agents.find(
+                (f: any) => f.name.toLowerCase() === a.name.toLowerCase()
+              );
+              return fa ? { ...a, running: fa.status === 'running' } : a;
+            }));
+          }
+          setRunningAgentRoot('__fleet__');
+          return;
+        } else {
+          // Not in fleet mode — clear fleet state if it was set
+          if (fleetStatus) setFleetStatus(null);
+        }
+
+        // 2. Single-agent mode — poll this agent's state
         const state = await kb.services.getAgentState(agentRoot);
         setCliStatus(state.status || 'stopped');
         setHealth(state.health || null);
         setServerReady(state.isRunning || false);
 
-        // If this agent just became running, re-read token
         if (state.isRunning && !serverReady) {
           const token = await kb.config.getApiToken();
           if (token) setApiToken(token);
+        }
+
+        // 3. Update all agent running indicators
+        if (agents.length > 0) {
+          const updated = await Promise.all(agents.map(async (a) => {
+            try {
+              const s = await kb.services.getAgentState(a.root);
+              return { ...a, running: s.isRunning };
+            } catch {
+              return { ...a, running: false };
+            }
+          }));
+          setAgents(updated);
+          const anyRunning = updated.find(a => a.running);
+          setRunningAgentRoot(anyRunning?.root || null);
         }
       } catch {
         setCliStatus('stopped');
@@ -170,58 +227,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     poll();
     const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
-  }, [agentRoot, isReady]);
-
-  // ── Poll fleet status (when in fleet mode) ──
-  useEffect(() => {
-    const kb = (window as any).kyberbot;
-    if (!kb || !isReady) return;
-
-    const poll = async () => {
-      try {
-        const result = await kb.fleet.getStatus();
-        if (result.fleetMode && result.fleet) {
-          setFleetStatus(result.fleet);
-        } else {
-          setFleetStatus(null);
-        }
-      } catch {
-        setFleetStatus(null);
-      }
-    };
-
-    // Only poll if we think fleet might be running
-    if (fleetStatus) {
-      const interval = setInterval(poll, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [isReady, fleetStatus !== null]);
-
-  // ── Update agent running indicators (for dropdown) ──
-  useEffect(() => {
-    const kb = (window as any).kyberbot;
-    if (!kb || !isReady || agents.length === 0) return;
-
-    const updateRunning = async () => {
-      const updated = await Promise.all(agents.map(async (a) => {
-        try {
-          const state = await kb.services.getAgentState(a.root);
-          return { ...a, running: state.isRunning };
-        } catch {
-          return { ...a, running: false };
-        }
-      }));
-      setAgents(updated);
-
-      // Find any running agent root for the dropdown indicator
-      const anyRunning = updated.find(a => a.running);
-      setRunningAgentRoot(anyRunning?.root || null);
-    };
-
-    updateRunning();
-    const interval = setInterval(updateRunning, 5000);
-    return () => clearInterval(interval);
-  }, [isReady, agents.length]);
+  }, [agentRoot, activeAgent, isReady]);
 
   return (
     <AppContext.Provider value={{
