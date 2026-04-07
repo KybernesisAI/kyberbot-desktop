@@ -119,26 +119,48 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
   setInterval(() => checkCliUpdate(), 6 * 60 * 60 * 1000);
 }
 
-function checkCliUpdate(): void {
+async function checkCliUpdate(): Promise<void> {
   try {
-    const output = execSync('kyberbot update --check', {
-      encoding: 'utf-8',
-      timeout: 30_000,
-      env: { ...process.env, PATH: getFullPath() },
+    // Get installed CLI version
+    let installed = '0.0.0';
+    try {
+      installed = execSync('kyberbot --version', {
+        encoding: 'utf-8',
+        timeout: 10_000,
+        env: { ...process.env, PATH: getFullPath() },
+      }).trim().replace(/^v/, '');
+    } catch {
+      log.warn('CLI not found in PATH — cannot check for updates');
+      return;
+    }
+
+    log.info('CLI installed version:', installed);
+
+    // Check GitHub releases API directly — no git/SSH required
+    const res = await fetch('https://api.github.com/repos/KybernesisAI/kyberbot/releases/latest', {
+      headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'kyberbot-desktop' },
+      signal: AbortSignal.timeout(10_000),
     });
 
-    log.info('CLI update check output:', output.trim().slice(0, 300));
+    if (!res.ok) {
+      log.warn('GitHub API returned', res.status);
+      return;
+    }
 
-    // If output contains indicators of available updates
-    const hasUpdate = output.includes('would change') ||
-                      output.includes('available') ||
-                      output.includes('behind') ||
-                      output.includes('new version');
+    const data = await res.json() as { tag_name?: string; html_url?: string };
+    const latest = (data.tag_name || '').replace(/^v/, '');
 
-    if (hasUpdate && !output.includes('up to date')) {
+    if (!latest) {
+      log.warn('No version tag in latest release');
+      return;
+    }
+
+    log.info('CLI latest release:', latest);
+
+    if (latest !== installed) {
       state.cliUpdateAvailable = true;
-      state.cliUpdateSummary = output.trim().slice(0, 200);
-      log.info('CLI update available');
+      state.cliUpdateSummary = `${installed} → ${latest}`;
+      log.info('CLI update available:', state.cliUpdateSummary);
     } else {
       state.cliUpdateAvailable = false;
       state.cliUpdateSummary = null;
