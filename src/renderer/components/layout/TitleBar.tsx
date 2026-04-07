@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Moon, Sun, ChevronDown, FolderOpen, Plus, Circle } from 'lucide-react';
+import { Moon, Sun, ChevronDown, FolderOpen, Plus, Circle, ArrowUp } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { FleetAgentInfo } from '../../context/AppContext';
 
@@ -16,6 +16,9 @@ export default function TitleBar() {
   const [showMenu, setShowMenu] = useState(false);
   const [fleetAgents, setFleetAgents] = useState<FleetAgentInfo[]>([]);
   const [loadingFleet, setLoadingFleet] = useState(false);
+  const [appUpdate, setAppUpdate] = useState(false);
+  const [cliUpdate, setCliUpdate] = useState(false);
+  const [updating, setUpdating] = useState<'cli' | 'app' | null>(null);
 
   useEffect(() => {
     const kb = (window as any).kyberbot;
@@ -25,6 +28,23 @@ export default function TitleBar() {
     });
     setIsDark(!document.documentElement.classList.contains('light'));
   }, [agentRoot]);
+
+  // Listen for update availability
+  useEffect(() => {
+    const kb = (window as any).kyberbot;
+    if (!kb?.updater) return;
+    // Check initial state
+    kb.updater.getState().then((s: any) => {
+      setAppUpdate(s.appUpdateAvailable);
+      setCliUpdate(s.cliUpdateAvailable);
+    });
+    // Subscribe to changes
+    const unsub = kb.updater.onStateChange((s: any) => {
+      setAppUpdate(s.appUpdateAvailable);
+      setCliUpdate(s.cliUpdateAvailable);
+    });
+    return unsub;
+  }, []);
 
   // Keep fleetAgents in sync with context agents
   useEffect(() => {
@@ -140,8 +160,63 @@ export default function TitleBar() {
         </button>
       </div>
 
-      {/* Right: Theme toggle */}
-      <div style={{ width: '70px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', WebkitAppRegion: 'no-drag' as any }}>
+      {/* Right: Update badges + Theme toggle */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', WebkitAppRegion: 'no-drag' as any, paddingRight: '8px' }}>
+        {/* CLI update badge */}
+        {cliUpdate && (
+          <button
+            onClick={async () => {
+              if (updating) return;
+              setUpdating('cli');
+              try {
+                const kb = (window as any).kyberbot;
+                await kb.updater.updateCli();
+                setCliUpdate(false);
+              } catch {}
+              setUpdating(null);
+            }}
+            title="KyberBot CLI update available"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '3px',
+              padding: '2px 6px',
+              fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '1px',
+              textTransform: 'uppercase',
+              color: '#10b981', border: '1px solid #10b981',
+              background: 'transparent', cursor: updating === 'cli' ? 'wait' : 'pointer',
+              opacity: updating === 'cli' ? 0.5 : 1,
+            }}
+          >
+            <ArrowUp size={8} />
+            {updating === 'cli' ? 'Updating...' : 'CLI'}
+          </button>
+        )}
+        {/* App update badge */}
+        {appUpdate && (
+          <button
+            onClick={async () => {
+              if (updating) return;
+              setUpdating('app');
+              try {
+                const kb = (window as any).kyberbot;
+                await kb.updater.installAppUpdate();
+              } catch {}
+              setUpdating(null);
+            }}
+            title="Desktop app update available"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '3px',
+              padding: '2px 6px',
+              fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '1px',
+              textTransform: 'uppercase',
+              color: '#22d3ee', border: '1px solid #22d3ee',
+              background: 'transparent', cursor: updating === 'app' ? 'wait' : 'pointer',
+              opacity: updating === 'app' ? 0.5 : 1,
+            }}
+          >
+            <ArrowUp size={8} />
+            {updating === 'app' ? 'Updating...' : 'APP'}
+          </button>
+        )}
         <button
           onClick={toggleTheme}
           title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}

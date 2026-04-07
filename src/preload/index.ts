@@ -77,6 +77,25 @@ const api = {
     popout: (): Promise<void> => ipcRenderer.invoke('brain:popout'),
   },
 
+  updater: {
+    getState: (): Promise<{ appUpdateAvailable: boolean; appVersion: string | null; cliUpdateAvailable: boolean; cliUpdateSummary: string | null }> =>
+      ipcRenderer.invoke('updater:getState'),
+    installAppUpdate: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('updater:installAppUpdate'),
+    updateCli: (): Promise<{ ok: boolean; output?: string; error?: string }> =>
+      ipcRenderer.invoke('updater:updateCli'),
+    onStateChange: (callback: (state: any) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: any) => callback(state);
+      ipcRenderer.on('updater:state', handler);
+      return () => ipcRenderer.removeListener('updater:state', handler);
+    },
+    onDownloaded: (callback: () => void): (() => void) => {
+      const handler = () => callback();
+      ipcRenderer.on('updater:downloaded', handler);
+      return () => ipcRenderer.removeListener('updater:downloaded', handler);
+    },
+  },
+
   onboarding: {
     create: (data: {
       agentRoot: string;
