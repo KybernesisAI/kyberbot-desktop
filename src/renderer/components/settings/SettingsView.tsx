@@ -136,10 +136,6 @@ export default function SettingsView() {
                   </select>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input type="checkbox" checked={identity.tunnel?.enabled || false} onChange={(e) => setIdentity({ ...identity, tunnel: { enabled: e.target.checked } })} style={{ accentColor: 'var(--accent-emerald)' }} />
-                <span style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)' }}>Enable ngrok tunnel</span>
-              </div>
             </div>
           </div>
 
@@ -147,6 +143,10 @@ export default function SettingsView() {
           <div style={sectionStyle}>
             <span className="section-title" style={{ color: 'var(--accent-teal, var(--accent-cyan))' }}>{'// TUNNEL'}</span>
             <div style={{ ...fieldGap, marginTop: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input type="checkbox" checked={identity.tunnel?.enabled || false} onChange={(e) => setIdentity({ ...identity, tunnel: { ...identity.tunnel, enabled: e.target.checked } })} style={{ accentColor: '#22d3ee' }} />
+                <span style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)' }}>Enable ngrok tunnel</span>
+              </div>
               {tunnelUrl ? (
                 <div style={{ padding: '10px', border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.05)' }}>
                   <div style={{ fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)', marginBottom: '6px' }}>TUNNEL ACTIVE</div>
@@ -162,6 +162,17 @@ export default function SettingsView() {
                 <label style={labelStyle}>ngrok Auth Token</label>
                 <input type="password" value={env['NGROK_AUTHTOKEN'] || ''} onChange={(e) => setEnv({ ...env, NGROK_AUTHTOKEN: e.target.value })} style={inputStyle} placeholder="Leave blank if globally configured" />
               </div>
+              <button onClick={async () => {
+                await save('Tunnel', async () => {
+                  await kb.config.writeIdentity(identity);
+                  await kb.config.writeEnv(env);
+                });
+              }} disabled={saving} style={btnStyle('#22d3ee')}>
+                {saving ? 'Saving...' : 'Save Tunnel Config'}
+              </button>
+              <span style={{ fontSize: '10px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                Restart the agent after saving for tunnel changes to take effect.
+              </span>
             </div>
           </div>
         </div>
