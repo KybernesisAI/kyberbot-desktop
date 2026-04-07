@@ -4,7 +4,7 @@
  */
 
 import { autoUpdater } from 'electron-updater';
-import { BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { execSync } from 'child_process';
 
 const log = {
@@ -54,6 +54,8 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
   });
 
   ipcMain.handle('updater:quitAndInstall', () => {
+    // Must set isQuitting so the macOS hide-to-tray close handler doesn't intercept
+    (app as any).isQuitting = true;
     autoUpdater.quitAndInstall(false, true); // isSilent=false, isForceRunAfter=true
   });
 
