@@ -210,7 +210,30 @@ async function checkCliUpdate(): Promise<void> {
   }
 }
 
+let _cachedShellPath: string | null = null;
+
 function getFullPath(): string {
+  if (_cachedShellPath) return _cachedShellPath;
+
+  // Try to get the user's real shell PATH by running a login shell
+  // This picks up nvm, homebrew, and any other PATH modifications from .zshrc/.bashrc
+  try {
+    const shell = process.env.SHELL || '/bin/zsh';
+    const shellPath = execSync(`${shell} -ilc "echo $PATH"`, {
+      encoding: 'utf-8',
+      timeout: 5_000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    if (shellPath && shellPath.length > 10) {
+      _cachedShellPath = shellPath;
+      log.info('Resolved shell PATH (' + shellPath.split(':').length + ' entries)');
+      return shellPath;
+    }
+  } catch (err) {
+    log.warn('Could not resolve shell PATH:', String(err));
+  }
+
+  // Fallback: manually construct PATH with common locations
   const { homedir } = require('os');
   const { join, existsSync } = require('path');
   const home = homedir();
@@ -224,5 +247,6 @@ function getFullPath(): string {
     }
   } catch {}
   paths.push(join(home, '.local', 'bin'), '/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin');
-  return paths.join(':') + ':' + (process.env.PATH || '');
+  _cachedShellPath = paths.join(':') + ':' + (process.env.PATH || '');
+  return _cachedShellPath;
 }
