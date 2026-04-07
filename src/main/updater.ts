@@ -54,7 +54,7 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
   });
 
   ipcMain.handle('updater:quitAndInstall', () => {
-    autoUpdater.quitAndInstall();
+    autoUpdater.quitAndInstall(false, true); // isSilent=false, isForceRunAfter=true
   });
 
   ipcMain.handle('updater:updateCli', async () => {
@@ -121,16 +121,54 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
 
 async function checkCliUpdate(): Promise<void> {
   try {
-    // Get installed CLI version
-    let installed = '0.0.0';
+    // Get installed CLI version — try multiple approaches
+    let installed = '';
+    const fullPath = getFullPath();
+
+    // Approach 1: kyberbot --version
     try {
       installed = execSync('kyberbot --version', {
         encoding: 'utf-8',
         timeout: 10_000,
-        env: { ...process.env, PATH: getFullPath() },
+        env: { ...process.env, PATH: fullPath },
       }).trim().replace(/^v/, '');
     } catch {
-      log.warn('CLI not found in PATH — cannot check for updates');
+      log.info('kyberbot --version failed, trying package.json lookup');
+    }
+
+    // Approach 2: read version from the CLI's package.json directly
+    if (!installed) {
+      try {
+        const { homedir } = require('os');
+        const { join, existsSync, realpathSync } = require('path');
+        const { readFileSync } = require('fs');
+        const home = homedir();
+
+        // Find kyberbot binary and resolve to real path
+        const whichResult = execSync('which kyberbot', {
+          encoding: 'utf-8',
+          timeout: 5_000,
+          env: { ...process.env, PATH: fullPath },
+        }).trim();
+
+        if (whichResult) {
+          // Binary is a symlink to dist/index.cjs — resolve and find package.json
+          const realBin = realpathSync(whichResult);
+          // <pkg>/dist/index.cjs → <pkg>/package.json
+          const pkgPath = join(realBin, '..', '..', 'package.json');
+          if (existsSync(pkgPath)) {
+            const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+            installed = pkg.version || '';
+            log.info('CLI version from package.json:', installed);
+          }
+        }
+      } catch {
+        log.warn('Could not find CLI version from package.json either');
+      }
+    }
+
+    if (!installed) {
+      log.warn('CLI not found — cannot check for updates');
       return;
     }
 
@@ -155,7 +193,7 @@ async function checkCliUpdate(): Promise<void> {
       return;
     }
 
-    log.info('CLI latest release:', latest);
+    log.info('CLI latest release:', latest, '| installed:', installed, '| match:', latest === installed);
 
     if (latest !== installed) {
       state.cliUpdateAvailable = true;
@@ -164,6 +202,7 @@ async function checkCliUpdate(): Promise<void> {
     } else {
       state.cliUpdateAvailable = false;
       state.cliUpdateSummary = null;
+      log.info('CLI is up to date');
     }
     pushState();
   } catch (err) {
