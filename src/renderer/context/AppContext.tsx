@@ -208,9 +208,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setServerReady(false);
           }
 
-          // Update remote agent running indicators
-          if (agents.length > 0) {
-            const updated = await Promise.all(agents.map(async (a) => {
+          // Update agent running indicators (re-fetch to avoid stale closure)
+          const remoteAgents = await kb.fleet.list().catch(() => []) as FleetAgentInfo[];
+          if (remoteAgents.length > 0) {
+            const updated = await Promise.all(remoteAgents.map(async (a: FleetAgentInfo) => {
               if (a.type === 'remote' && a.remoteUrl) {
                 try {
                   const ctrl = new AbortController();
@@ -293,9 +294,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (token) setApiToken(token);
         }
 
-        // 3. Update all agent running indicators
-        if (agents.length > 0) {
-          const updated = await Promise.all(agents.map(async (a) => {
+        // 3. Re-fetch agent list from registry (catches newly registered agents)
+        try {
+          const freshAgents = await kb.fleet.list();
+          setAgents(freshAgents);
+        } catch {}
+
+        // 4. Update running indicators
+        const currentAgents = await kb.fleet.list().catch(() => []) as FleetAgentInfo[];
+        if (currentAgents.length > 0) {
+          const updated = await Promise.all(currentAgents.map(async (a: FleetAgentInfo) => {
             if (a.type === 'remote' && a.remoteUrl) {
               try {
                 const ctrl = new AbortController();
