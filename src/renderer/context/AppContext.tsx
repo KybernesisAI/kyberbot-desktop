@@ -15,6 +15,9 @@ export interface FleetAgentInfo {
   description: string;
   registered: string;
   running: boolean;
+  type?: 'local' | 'remote';
+  remoteUrl?: string;
+  remoteToken?: string;
 }
 
 export interface FleetStatusData {
@@ -91,6 +94,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!agent) return;
 
     setActiveAgentState(name);
+
+    if (agent.type === 'remote') {
+      // Remote agent — point to remote URL, use remote token, skip local root config
+      if (agent.remoteUrl) setBaseServerUrl(agent.remoteUrl);
+      if (agent.remoteToken) setApiToken(agent.remoteToken);
+      // Don't call kb.config.setAgentRoot for remote agents
+      return;
+    }
+
+    // Local agent — configure local root
     kb.config.setAgentRoot(agent.root).then(() => {
       setAgentRoot(agent.root);
       kb.config.getServerUrl().then((url: string) => {
@@ -146,10 +159,83 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── Master poll: agent state + fleet status, every 3 seconds ──
   useEffect(() => {
     const kb = (window as any).kyberbot;
-    if (!kb || !agentRoot || !isReady) return;
+    if (!kb || !isReady) return;
+
+    // Find the current active agent info
+    const currentAgent = agents.find(a => a.name.toLowerCase() === activeAgent?.toLowerCase());
+    const isRemoteAgent = currentAgent?.type === 'remote';
+
+    // Remote agents don't need agentRoot, but local agents do
+    if (!isRemoteAgent && !agentRoot) return;
 
     const poll = async () => {
       try {
+        // If viewing a remote agent, poll its health directly
+        if (isRemoteAgent && currentAgent?.remoteUrl) {
+          try {
+            const headers: Record<string, string> = {};
+            if (currentAgent.remoteToken) headers['Authorization'] = `Bearer ${currentAgent.remoteToken}`;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3000);
+            const res = await fetch(`${currentAgent.remoteUrl}/health`, {
+              signal: controller.signal,
+              headers,
+            });
+            clearTimeout(timeout);
+            if (res.ok) {
+              const data = await res.json();
+              setHealth({
+                status: data.status || 'ok',
+                timestamp: data.timestamp || new Date().toISOString(),
+                uptime: data.uptime || '0s',
+                channels: data.channels || [],
+                services: data.services || [],
+                errors: data.errors || 0,
+                memory: data.memory || {},
+                pid: data.pid || 0,
+                node_version: data.node_version || '',
+              });
+              setCliStatus('running');
+              setServerReady(true);
+            } else {
+              setHealth(null);
+              setCliStatus('stopped');
+              setServerReady(false);
+            }
+          } catch {
+            setHealth(null);
+            setCliStatus('stopped');
+            setServerReady(false);
+          }
+
+          // Update remote agent running indicators
+          if (agents.length > 0) {
+            const updated = await Promise.all(agents.map(async (a) => {
+              if (a.type === 'remote' && a.remoteUrl) {
+                try {
+                  const ctrl = new AbortController();
+                  const t = setTimeout(() => ctrl.abort(), 2000);
+                  const hdrs: Record<string, string> = {};
+                  if (a.remoteToken) hdrs['Authorization'] = `Bearer ${a.remoteToken}`;
+                  const r = await fetch(`${a.remoteUrl}/health`, { signal: ctrl.signal, headers: hdrs });
+                  clearTimeout(t);
+                  return { ...a, running: r.ok };
+                } catch {
+                  return { ...a, running: false };
+                }
+              }
+              try {
+                const s = await kb.services.getAgentState(a.root);
+                return { ...a, running: s.isRunning };
+              } catch {
+                return { ...a, running: false };
+              }
+            }));
+            setAgents(updated);
+          }
+          return;
+        }
+
         // 1. Check fleet status first
         const fleetResult = await kb.fleet.getStatus();
         const isFleet = fleetResult.fleetMode && fleetResult.fleet;
@@ -182,6 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // Update agent running indicators from fleet data
           if (fleetResult.fleet?.agents) {
             setAgents(prev => prev.map(a => {
+              if (a.type === 'remote') return a; // Remote agents manage their own status
               const fa = fleetResult.fleet.agents.find(
                 (f: any) => f.name.toLowerCase() === a.name.toLowerCase()
               );
@@ -209,6 +296,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // 3. Update all agent running indicators
         if (agents.length > 0) {
           const updated = await Promise.all(agents.map(async (a) => {
+            if (a.type === 'remote' && a.remoteUrl) {
+              try {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), 2000);
+                const hdrs: Record<string, string> = {};
+                if (a.remoteToken) hdrs['Authorization'] = `Bearer ${a.remoteToken}`;
+                const r = await fetch(`${a.remoteUrl}/health`, { signal: ctrl.signal, headers: hdrs });
+                clearTimeout(t);
+                return { ...a, running: r.ok };
+              } catch {
+                return { ...a, running: false };
+              }
+            }
             try {
               const s = await kb.services.getAgentState(a.root);
               return { ...a, running: s.isRunning };

@@ -18,6 +18,9 @@ import { LifecycleManager, FleetStatus } from '../lifecycle.js';
 interface RegistryAgent {
   root: string;
   registered: string;
+  type?: 'local' | 'remote';
+  remoteUrl?: string;
+  remoteToken?: string;
 }
 
 interface RegistryData {
@@ -32,6 +35,9 @@ interface AgentInfo {
   description: string;
   registered: string;
   running: boolean;
+  type: 'local' | 'remote';
+  remoteUrl?: string;
+  remoteToken?: string;
 }
 
 // ── Helpers ──
@@ -104,6 +110,36 @@ export function registerFleetHandlers(
 
     const entries = Object.entries(registry.agents);
     for (const [name, entry] of entries) {
+      const isRemote = entry.type === 'remote';
+
+      if (isRemote) {
+        // Remote agent — probe its remote URL for health
+        let running = false;
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 3000);
+          const res = await fetch(`${entry.remoteUrl}/health`, { signal: controller.signal });
+          clearTimeout(timeout);
+          running = res.ok;
+        } catch {
+          running = false;
+        }
+
+        results.push({
+          name: name,
+          root: '',
+          port: 0,
+          description: `Remote agent at ${entry.remoteUrl}`,
+          registered: entry.registered,
+          running,
+          type: 'remote',
+          remoteUrl: entry.remoteUrl,
+          remoteToken: entry.remoteToken,
+        });
+        continue;
+      }
+
+      // Local agent
       const identity = readIdentityFromRoot(entry.root);
 
       let running = false;
@@ -123,6 +159,7 @@ export function registerFleetHandlers(
         description: identity.agent_description,
         registered: entry.registered,
         running,
+        type: 'local',
       });
     }
 
@@ -143,6 +180,54 @@ export function registerFleetHandlers(
   });
 
   ipcMain.handle('fleet:unregister', async (_event, name: string): Promise<{ ok: boolean }> => {
+    const registry = readRegistry();
+    const key = name.toLowerCase();
+
+    if (registry.agents[key]) {
+      delete registry.agents[key];
+      if (registry.defaults?.auto_start) {
+        registry.defaults.auto_start = registry.defaults.auto_start.filter((n) => n !== key);
+      }
+      writeRegistry(registry);
+    }
+
+    return { ok: true };
+  });
+
+  // ── Remote agent handlers ──
+
+  ipcMain.handle('fleet:register-remote', async (_event, name: string, url: string, token: string): Promise<{ ok: boolean; error?: string }> => {
+    // Validate by pinging the remote health endpoint
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${url}/health`, { signal: controller.signal, headers });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        return { ok: false, error: `Health check failed: HTTP ${res.status}` };
+      }
+    } catch (err: any) {
+      return { ok: false, error: `Cannot reach ${url}/health: ${err.message}` };
+    }
+
+    const registry = readRegistry();
+    const key = name.toLowerCase();
+
+    registry.agents[key] = {
+      root: '',
+      registered: new Date().toISOString(),
+      type: 'remote',
+      remoteUrl: url,
+      remoteToken: token,
+    };
+
+    writeRegistry(registry);
+    return { ok: true };
+  });
+
+  ipcMain.handle('fleet:unregister-remote', async (_event, name: string): Promise<{ ok: boolean }> => {
     const registry = readRegistry();
     const key = name.toLowerCase();
 

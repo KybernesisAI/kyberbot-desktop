@@ -109,12 +109,16 @@ const api = {
   },
 
   fleet: {
-    list: (): Promise<Array<{ name: string; root: string; port: number; description: string; registered: string; running: boolean }>> =>
+    list: (): Promise<Array<{ name: string; root: string; port: number; description: string; registered: string; running: boolean; type: 'local' | 'remote'; remoteUrl?: string; remoteToken?: string }>> =>
       ipcRenderer.invoke('fleet:list'),
     register: (rootPath: string): Promise<{ ok: boolean; name: string }> =>
       ipcRenderer.invoke('fleet:register', rootPath),
     unregister: (name: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('fleet:unregister', name),
+    registerRemote: (name: string, url: string, token: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('fleet:register-remote', name, url, token),
+    unregisterRemote: (name: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('fleet:unregister-remote', name),
     start: (agents: string[]): Promise<{ ok: boolean; status: string }> =>
       ipcRenderer.invoke('fleet:start', agents),
     stop: (): Promise<{ ok: boolean; status: string }> =>

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { FleetStatusData } from '../../context/AppContext';
+import type { FleetStatusData, FleetAgentInfo } from '../../context/AppContext';
 import { getLogBuffer, subscribeToLogs } from '../../hooks/useLogs';
 import AnsiToHtml from 'ansi-to-html';
 
@@ -309,10 +309,11 @@ function _removedAgentBusPlaceholder({ agents, activeAgent }: {
 
 // ── Fleet Overview Component ──
 
-function FleetOverview({ fleetStatus, activeAgent, setActiveAgent }: {
+function FleetOverview({ fleetStatus, activeAgent, setActiveAgent, agents: registeredAgents }: {
   fleetStatus: FleetStatusData;
   activeAgent: string | null;
   setActiveAgent: (name: string) => void;
+  agents?: FleetAgentInfo[];
 }) {
   return (
     <div className="mb-6">
@@ -343,6 +344,8 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent }: {
       }}>
         {fleetStatus.agents.map((agent) => {
           const isActive = activeAgent?.toLowerCase() === agent.name.toLowerCase();
+          const regAgent = registeredAgents?.find(a => a.name.toLowerCase() === agent.name.toLowerCase());
+          const isRemote = regAgent?.type === 'remote';
           return (
             <button
               key={agent.name}
@@ -350,7 +353,7 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent }: {
               className="p-3 border text-left transition-colors"
               style={{
                 background: isActive ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
-                borderColor: isActive ? 'var(--accent-emerald)' : 'var(--border-color)',
+                borderColor: isActive ? (isRemote ? 'var(--accent-cyan)' : 'var(--accent-emerald)') : 'var(--border-color)',
                 cursor: 'pointer',
               }}
             >
@@ -361,20 +364,29 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent }: {
                 }} />
                 <span style={{
                   fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600,
-                  color: isActive ? 'var(--accent-emerald)' : 'var(--fg-primary)',
+                  color: isActive ? (isRemote ? 'var(--accent-cyan)' : 'var(--accent-emerald)') : 'var(--fg-primary)',
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                 }}>
                   {agent.name}
                 </span>
+                {isRemote && (
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: '7px', letterSpacing: '0.5px',
+                    textTransform: 'uppercase', color: '#22d3ee',
+                    border: '1px solid #22d3ee', padding: '0px 3px', lineHeight: '14px',
+                  }}>
+                    REMOTE
+                  </span>
+                )}
                 <span style={{
                   fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px',
                   textTransform: 'uppercase',
-                  color: statusColor(agent.status),
+                  color: isRemote ? (agent.status === 'running' ? '#22d3ee' : statusColor(agent.status)) : statusColor(agent.status),
                   marginLeft: 'auto',
                 }}>
-                  {agent.status}
+                  {isRemote ? (agent.status === 'running' ? 'remote' : agent.status) : agent.status}
                 </span>
-                {agent.uptime && (
+                {!isRemote && agent.uptime && (
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-muted)' }}>
                     {agent.uptime}
                   </span>
@@ -417,6 +429,9 @@ export default function DashboardView() {
   const kb = (window as any).kyberbot;
   const [logs, setLogs] = useState<string[]>([]);
   const logContainerRef = useRef<HTMLDivElement>(null);
+
+  const currentAgent = agents.find(a => a.name?.toLowerCase() === activeAgent?.toLowerCase());
+  const isRemoteAgent = currentAgent?.type === 'remote';
 
   const isRunning = cliStatus === 'running';
   const isStopping = cliStatus === 'stopping';
@@ -481,6 +496,7 @@ export default function DashboardView() {
           fleetStatus={fleetStatus}
           activeAgent={activeAgent}
           setActiveAgent={setActiveAgent}
+          agents={agents}
         />
       )}
 
@@ -488,58 +504,73 @@ export default function DashboardView() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <span className="section-title" style={{ color: 'var(--accent-emerald)' }}>
-          {fleetMode && activeAgent ? `// ${activeAgent.toUpperCase()} SERVICES` : '// SERVICES'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="section-title" style={{ color: isRemoteAgent ? 'var(--accent-cyan)' : 'var(--accent-emerald)' }}>
+            {fleetMode && activeAgent ? `// ${activeAgent.toUpperCase()} SERVICES` : '// SERVICES'}
+          </span>
+          {isRemoteAgent && (
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.5px',
+              textTransform: 'uppercase', color: '#22d3ee',
+              border: '1px solid #22d3ee', padding: '1px 5px', lineHeight: '14px',
+            }}>
+              REMOTE
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {/* Status badge */}
           <span className="text-[9px] tracking-[1px] uppercase" style={{
             fontFamily: 'var(--font-mono)',
-            color: isRunning ? 'var(--status-success)' : isStopping ? 'var(--status-warning)' : isStarting ? 'var(--status-warning)' : 'var(--fg-muted)',
+            color: isRemoteAgent
+              ? (isRunning ? '#22d3ee' : 'var(--fg-muted)')
+              : (isRunning ? 'var(--status-success)' : isStopping ? 'var(--status-warning)' : isStarting ? 'var(--status-warning)' : 'var(--fg-muted)'),
           }}>
-            {cliStatus}
+            {isRemoteAgent ? (isRunning ? 'remote' : 'offline') : cliStatus}
           </span>
-          {/* Start current agent only */}
-          <button
-            onClick={async () => {
-              await kb?.services.start();
-            }}
-            disabled={isRunning || isStarting || isStopping}
-            className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              borderColor: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-emerald)',
-              color: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-emerald)',
-              background: 'transparent',
-              cursor: isRunning || isStarting || isStopping ? 'default' : 'pointer',
-              opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
-            }}
-          >
-            {`Start ${activeAgent || 'Agent'}`}
-          </button>
-          <button
-            onClick={async () => {
-              if (fleetMode && fleetStatus) {
-                // Fleet mode: stop the entire fleet
-                await kb?.fleet.stop();
-              } else {
-                // Single agent mode
-                await kb?.services.stop();
-              }
-            }}
-            disabled={!isRunning || isStopping}
-            className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              borderColor: isRunning && !isStopping ? 'var(--status-error)' : 'var(--fg-muted)',
-              color: isRunning && !isStopping ? 'var(--status-error)' : 'var(--fg-muted)',
-              background: 'transparent',
-              cursor: isRunning && !isStopping ? 'pointer' : 'default',
-              opacity: isRunning && !isStopping ? 1 : 0.3,
-            }}
-          >
-            {isStopping ? 'Stopping...' : (fleetMode && fleetStatus ? 'Stop Fleet' : `Stop ${activeAgent || 'Agent'}`)}
-          </button>
+          {/* Start/Stop — hidden for remote agents */}
+          {!isRemoteAgent && (
+            <>
+              <button
+                onClick={async () => {
+                  await kb?.services.start();
+                }}
+                disabled={isRunning || isStarting || isStopping}
+                className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  borderColor: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-emerald)',
+                  color: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-emerald)',
+                  background: 'transparent',
+                  cursor: isRunning || isStarting || isStopping ? 'default' : 'pointer',
+                  opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
+                }}
+              >
+                {`Start ${activeAgent || 'Agent'}`}
+              </button>
+              <button
+                onClick={async () => {
+                  if (fleetMode && fleetStatus) {
+                    await kb?.fleet.stop();
+                  } else {
+                    await kb?.services.stop();
+                  }
+                }}
+                disabled={!isRunning || isStopping}
+                className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  borderColor: isRunning && !isStopping ? 'var(--status-error)' : 'var(--fg-muted)',
+                  color: isRunning && !isStopping ? 'var(--status-error)' : 'var(--fg-muted)',
+                  background: 'transparent',
+                  cursor: isRunning && !isStopping ? 'pointer' : 'default',
+                  opacity: isRunning && !isStopping ? 1 : 0.3,
+                }}
+              >
+                {isStopping ? 'Stopping...' : (fleetMode && fleetStatus ? 'Stop Fleet' : `Stop ${activeAgent || 'Agent'}`)}
+              </button>
+            </>
+          )}
         </div>
       </div>
 

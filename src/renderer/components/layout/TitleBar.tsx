@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Moon, Sun, ChevronDown, FolderOpen, Plus, Circle, ArrowUp } from 'lucide-react';
+import { Moon, Sun, ChevronDown, FolderOpen, Plus, Circle, ArrowUp, Globe, Loader2, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { FleetAgentInfo } from '../../context/AppContext';
 
@@ -19,6 +19,12 @@ export default function TitleBar() {
   const [appUpdate, setAppUpdate] = useState(false);
   const [cliUpdate, setCliUpdate] = useState(false);
   const [updating, setUpdating] = useState<'cli' | 'app' | null>(null);
+  const [showRemoteForm, setShowRemoteForm] = useState(false);
+  const [remoteName, setRemoteName] = useState('');
+  const [remoteUrl, setRemoteUrl] = useState('');
+  const [remoteToken, setRemoteToken] = useState('');
+  const [remoteValidating, setRemoteValidating] = useState(false);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
 
   useEffect(() => {
     const kb = (window as any).kyberbot;
@@ -110,6 +116,29 @@ export default function TitleBar() {
   const createNewAgent = () => {
     (window as any).kyberbot.config.setAgentRoot('').then(() => window.location.reload());
     setShowMenu(false);
+  };
+
+  const submitRemoteAgent = async () => {
+    if (!remoteName.trim() || !remoteUrl.trim()) return;
+    setRemoteValidating(true);
+    setRemoteError(null);
+    try {
+      const kb = (window as any).kyberbot;
+      const result = await kb.fleet.registerRemote(remoteName.trim(), remoteUrl.trim(), remoteToken.trim());
+      if (result.ok) {
+        setShowRemoteForm(false);
+        setRemoteName('');
+        setRemoteUrl('');
+        setRemoteToken('');
+        loadFleet();
+      } else {
+        setRemoteError(result.error || 'Registration failed');
+      }
+    } catch (err: any) {
+      setRemoteError(err.message || 'Unknown error');
+    } finally {
+      setRemoteValidating(false);
+    }
   };
 
   const menuItemStyle: React.CSSProperties = {
@@ -248,33 +277,48 @@ export default function TitleBar() {
             )}
             {!loadingFleet && fleetAgents.length > 0 && fleetAgents.map((agent) => (
               <button
-                key={agent.root}
+                key={agent.type === 'remote' ? `remote-${agent.name}` : agent.root}
                 onClick={() => switchToAgent(agent)}
                 style={menuItemStyle}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
-                <Circle
-                  size={6}
-                  fill={
-                    fleetMode
-                      ? (agent.running ? '#10b981' : '#6b7280')
-                      : (runningAgentRoot === agent.root ? '#10b981' : '#6b7280')
-                  }
-                  stroke="none"
-                  style={{ flexShrink: 0 }}
-                />
+                {agent.type === 'remote' ? (
+                  <Globe size={8} style={{ flexShrink: 0, color: agent.running ? '#22d3ee' : '#6b7280' }} />
+                ) : (
+                  <Circle
+                    size={6}
+                    fill={
+                      fleetMode
+                        ? (agent.running ? '#10b981' : '#6b7280')
+                        : (runningAgentRoot === agent.root ? '#10b981' : '#6b7280')
+                    }
+                    stroke="none"
+                    style={{ flexShrink: 0 }}
+                  />
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', overflow: 'hidden' }}>
-                  <span style={{
-                    color: (fleetMode ? agent.name === activeAgent : agent.root === agentRoot)
-                      ? 'var(--accent-emerald)' : 'var(--fg-secondary)',
-                    fontWeight: (fleetMode ? agent.name === activeAgent : agent.root === agentRoot)
-                      ? 600 : 400,
-                  }}>
-                    {agent.name}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{
+                      color: (fleetMode ? agent.name === activeAgent : agent.type === 'remote' ? agent.name === activeAgent : agent.root === agentRoot)
+                        ? 'var(--accent-emerald)' : 'var(--fg-secondary)',
+                      fontWeight: (fleetMode ? agent.name === activeAgent : agent.type === 'remote' ? agent.name === activeAgent : agent.root === agentRoot)
+                        ? 600 : 400,
+                    }}>
+                      {agent.name}
+                    </span>
+                    {agent.type === 'remote' && (
+                      <span style={{
+                        fontSize: '7px', letterSpacing: '0.5px', textTransform: 'uppercase',
+                        color: '#22d3ee', border: '1px solid #22d3ee', padding: '0px 3px',
+                        fontFamily: 'var(--font-mono)', lineHeight: '14px',
+                      }}>
+                        REMOTE
+                      </span>
+                    )}
+                  </div>
                   <span style={{ fontSize: '9px', color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {agent.root.replace(/^\/Users\/[^/]+\//, '~/')}
+                    {agent.type === 'remote' ? (agent.remoteUrl || 'remote') : agent.root.replace(/^\/Users\/[^/]+\//, '~/')}
                   </span>
                 </div>
               </button>
@@ -298,6 +342,89 @@ export default function TitleBar() {
               <FolderOpen size={11} style={{ flexShrink: 0, opacity: 0.6 }} />
               Browse...
             </button>
+
+            {/* Add Remote Agent */}
+            {!showRemoteForm ? (
+              <button
+                onClick={() => { setShowRemoteForm(true); setRemoteError(null); }}
+                style={{ ...menuItemStyle, color: 'var(--accent-cyan)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                <Globe size={11} style={{ flexShrink: 0 }} />
+                Add Remote Agent
+              </button>
+            ) : (
+              <div style={{ padding: '8px 12px' }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--accent-cyan)' }}>
+                    Add Remote Agent
+                  </span>
+                  <button onClick={() => { setShowRemoteForm(false); setRemoteError(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', padding: 0 }}>
+                    <X size={10} />
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <input
+                    type="text"
+                    placeholder="Name"
+                    value={remoteName}
+                    onChange={(e) => setRemoteName(e.target.value)}
+                    style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '10px',
+                      padding: '4px 6px', background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-color)', color: 'var(--fg-primary)',
+                      outline: 'none', width: '100%',
+                    }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="URL (e.g. https://abc123.ngrok.io)"
+                    value={remoteUrl}
+                    onChange={(e) => setRemoteUrl(e.target.value)}
+                    style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '10px',
+                      padding: '4px 6px', background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-color)', color: 'var(--fg-primary)',
+                      outline: 'none', width: '100%',
+                    }}
+                  />
+                  <input
+                    type="password"
+                    placeholder="API Token"
+                    value={remoteToken}
+                    onChange={(e) => setRemoteToken(e.target.value)}
+                    style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '10px',
+                      padding: '4px 6px', background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-color)', color: 'var(--fg-primary)',
+                      outline: 'none', width: '100%',
+                    }}
+                  />
+                  {remoteError && (
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--status-error)' }}>
+                      {remoteError}
+                    </span>
+                  )}
+                  <button
+                    onClick={submitRemoteAgent}
+                    disabled={remoteValidating || !remoteName.trim() || !remoteUrl.trim()}
+                    style={{
+                      fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px',
+                      textTransform: 'uppercase', padding: '4px 8px', marginTop: '2px',
+                      background: 'transparent', cursor: remoteValidating ? 'wait' : 'pointer',
+                      border: `1px solid ${remoteValidating ? 'var(--fg-muted)' : 'var(--accent-cyan)'}`,
+                      color: remoteValidating ? 'var(--fg-muted)' : 'var(--accent-cyan)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                      opacity: (!remoteName.trim() || !remoteUrl.trim()) ? 0.3 : 1,
+                    }}
+                  >
+                    {remoteValidating && <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} />}
+                    {remoteValidating ? 'Validating...' : 'Connect'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Create new */}
             <button
