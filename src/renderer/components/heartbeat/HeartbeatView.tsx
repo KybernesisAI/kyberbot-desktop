@@ -16,7 +16,7 @@ interface HeartbeatTask {
 }
 
 export default function HeartbeatView() {
-  const { serverUrl, apiToken } = useApp();
+  const { serverUrl, apiToken, serverReady } = useApp();
   const [tasks, setTasks] = useState<HeartbeatTask[]>([]);
   const [rawContent, setRawContent] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -30,6 +30,7 @@ export default function HeartbeatView() {
   const [newTask, setNewTask] = useState({ name: '', cadence: 'every 30m', action: '', skill: '', window: '' });
 
   const loadData = useCallback(async () => {
+    if (!serverReady) return;
     try {
       const data = await manageFetch<{ tasks: HeartbeatTask[]; rawContent: string }>(serverUrl, apiToken, '/heartbeat');
       setTasks(data.tasks);
@@ -37,14 +38,15 @@ export default function HeartbeatView() {
       setEditContent(data.rawContent);
     } catch { /* offline */ }
     setLoading(false);
-  }, [serverUrl, apiToken]);
+  }, [serverUrl, apiToken, serverReady]);
 
   const loadLog = useCallback(async () => {
+    if (!serverReady) return;
     try {
       const data = await manageFetch<{ content: string }>(serverUrl, apiToken, '/heartbeat/log?lines=200');
       setLogContent(data.content);
     } catch { /* offline */ }
-  }, [serverUrl, apiToken]);
+  }, [serverUrl, apiToken, serverReady]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { if (tab === 'log') loadLog(); }, [tab, loadLog]);

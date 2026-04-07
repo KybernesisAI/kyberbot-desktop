@@ -13,7 +13,7 @@ import type { GraphResponse, GraphNodeDTO } from './canvas/types';
 type BrainSubTab = 'graph' | 'entities' | 'notes' | 'timeline' | 'search';
 
 export default function BrainView() {
-  const { serverUrl, apiToken } = useApp();
+  const { serverUrl, apiToken, serverReady } = useApp();
   const [activeTab, setActiveTab] = useState<BrainSubTab>('graph');
   const [graphData, setGraphData] = useState<GraphResponse>({ nodes: [], edges: [] });
   const [loading, setLoading] = useState(true);
@@ -21,6 +21,7 @@ export default function BrainView() {
   const [selectedNode, setSelectedNode] = useState<GraphNodeDTO | null>(null);
 
   const loadGraph = useCallback(async () => {
+    if (!serverReady) return;
     try {
       const data = await brainFetch<GraphResponse>(serverUrl, apiToken, '/graph?limit=150');
       setGraphData(data);
@@ -33,7 +34,7 @@ export default function BrainView() {
     } finally {
       setLoading(false);
     }
-  }, [serverUrl, apiToken]);
+  }, [serverUrl, apiToken, serverReady]);
 
   useEffect(() => { loadGraph(); }, [loadGraph]);
 
@@ -101,9 +102,9 @@ export default function BrainView() {
         )}
 
         {activeTab === 'entities' && <EntityBrowser />}
-        {activeTab === 'notes' && <BrainNotesView serverUrl={serverUrl} apiToken={apiToken} />}
-        {activeTab === 'timeline' && <TimelineView serverUrl={serverUrl} apiToken={apiToken} />}
-        {activeTab === 'search' && <SearchView serverUrl={serverUrl} apiToken={apiToken} />}
+        {activeTab === 'notes' && <BrainNotesView serverUrl={serverUrl} apiToken={apiToken} serverReady={serverReady} />}
+        {activeTab === 'timeline' && <TimelineView serverUrl={serverUrl} apiToken={apiToken} serverReady={serverReady} />}
+        {activeTab === 'search' && <SearchView serverUrl={serverUrl} apiToken={apiToken} serverReady={serverReady} />}
       </div>
     </div>
   );
@@ -118,18 +119,19 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   identity: { label: 'IDENTITY', color: 'var(--accent-amber)' },
 };
 
-function BrainNotesView({ serverUrl, apiToken }: { serverUrl: string; apiToken: string | null }) {
+function BrainNotesView({ serverUrl, apiToken, serverReady }: { serverUrl: string; apiToken: string | null; serverReady: boolean }) {
   const [notes, setNotes] = useState<any[]>([]);
   const [selectedNote, setSelectedNote] = useState<{ name: string; content: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!serverReady) return;
     manageFetch<{ notes: any[] }>(serverUrl, apiToken, '/brain-notes')
       .then(d => setNotes(d.notes))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [serverUrl, apiToken]);
+  }, [serverUrl, apiToken, serverReady]);
 
   const openNote = async (path: string) => {
     try {
@@ -202,17 +204,18 @@ function BrainNotesView({ serverUrl, apiToken }: { serverUrl: string; apiToken: 
 
 // ── Timeline (expandable) ──
 
-function TimelineView({ serverUrl, apiToken }: { serverUrl: string; apiToken: string | null }) {
+function TimelineView({ serverUrl, apiToken, serverReady }: { serverUrl: string; apiToken: string | null; serverReady: boolean }) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   useEffect(() => {
+    if (!serverReady) return;
     brainFetch<{ events: any[] }>(serverUrl, apiToken, '/timeline?limit=100')
       .then(data => setEvents(data.events))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [serverUrl, apiToken]);
+  }, [serverUrl, apiToken, serverReady]);
 
   const toggle = (i: number) => {
     setExpanded(prev => {
@@ -253,7 +256,7 @@ function TimelineView({ serverUrl, apiToken }: { serverUrl: string; apiToken: st
 
 // ── Search (expandable results) ──
 
-function SearchView({ serverUrl, apiToken }: { serverUrl: string; apiToken: string | null }) {
+function SearchView({ serverUrl, apiToken, serverReady }: { serverUrl: string; apiToken: string | null; serverReady: boolean }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

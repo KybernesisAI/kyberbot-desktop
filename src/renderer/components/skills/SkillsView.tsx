@@ -18,7 +18,7 @@ interface Skill {
 }
 
 export default function SkillsView() {
-  const { serverUrl, apiToken } = useApp();
+  const { serverUrl, apiToken, serverReady } = useApp();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +29,7 @@ export default function SkillsView() {
   const [newDesc, setNewDesc] = useState('');
 
   const loadSkills = useCallback(async () => {
+    if (!serverReady) return;
     try {
       const data = await manageFetch<{ skills: Skill[] }>(serverUrl, apiToken, '/skills');
       setSkills(data.skills);
@@ -38,7 +39,7 @@ export default function SkillsView() {
     } finally {
       setLoading(false);
     }
-  }, [serverUrl, apiToken]);
+  }, [serverUrl, apiToken, serverReady]);
 
   useEffect(() => { loadSkills(); }, [loadSkills]);
 

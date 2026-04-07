@@ -18,7 +18,7 @@ interface AgentMessage {
 }
 
 export default function BusView() {
-  const { baseServerUrl, apiToken, fleetMode, fleetStatus, agents, activeAgent } = useApp();
+  const { baseServerUrl, apiToken, fleetMode, fleetStatus, agents, activeAgent, serverReady } = useApp();
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [recipient, setRecipient] = useState<string>('broadcast');
   const [messageText, setMessageText] = useState('');
@@ -36,13 +36,14 @@ export default function BusView() {
 
   // Fetch bus history
   const fetchHistory = useCallback(async () => {
+    if (!serverReady) return;
     try {
       const res = await fetch(`${baseServerUrl}/fleet/bus/history?limit=100`, { headers });
       if (!res.ok) return;
       const data = await res.json();
       if (data.messages) setMessages(data.messages);
     } catch { /* bus not available */ }
-  }, [baseServerUrl, headers]);
+  }, [baseServerUrl, headers, serverReady]);
 
   useEffect(() => {
     fetchHistory();

@@ -22,7 +22,7 @@ const BLOCK_META: Record<BlockName, { label: string; description: string; color:
 };
 
 export default function MemoryBlocks() {
-  const { serverUrl, apiToken, serverReady } = useApp();
+  const { serverUrl, apiToken, serverReady, activeAgent } = useApp();
   const [blocks, setBlocks] = useState<Record<BlockName, BlockData>>({
     soul: { content: '', lastModified: '' },
     user: { content: '', lastModified: '' },
@@ -33,7 +33,10 @@ export default function MemoryBlocks() {
   const [editing, setEditing] = useState<BlockName | null>(null);
 
   const headers = useCallback((): Record<string, string> => {
-    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    const h: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
     if (apiToken) h['Authorization'] = `Bearer ${apiToken}`;
     return h;
   }, [apiToken]);
@@ -57,7 +60,7 @@ export default function MemoryBlocks() {
     for (const [name, data] of results) newBlocks[name as BlockName] = data;
     setBlocks(newBlocks);
     setLoading(false);
-  }, [serverUrl, headers, serverReady]);
+  }, [serverUrl, headers, serverReady, activeAgent]);
 
   useEffect(() => { fetchBlocks(); }, [fetchBlocks]);
 

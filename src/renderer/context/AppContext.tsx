@@ -82,9 +82,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const fleetMode = fleetStatus !== null;
 
-  const serverUrl = fleetMode && activeAgent
-    ? `${baseServerUrl}/agent/${encodeURIComponent(activeAgent.toLowerCase())}`
-    : baseServerUrl;
+  // Compute serverUrl: remote agents use their own URL, fleet local agents use /agent/ prefix
+  const currentAgentInfo = agents.find(a => a.name.toLowerCase() === activeAgent?.toLowerCase());
+  const serverUrl = (() => {
+    if (currentAgentInfo?.type === 'remote' && currentAgentInfo.remoteUrl) {
+      return currentAgentInfo.remoteUrl;
+    }
+    if (fleetMode && activeAgent) {
+      return `${baseServerUrl}/agent/${encodeURIComponent(activeAgent.toLowerCase())}`;
+    }
+    return baseServerUrl;
+  })();
 
   // Switch active agent — no reload
   const setActiveAgent = useCallback((name: string) => {
@@ -96,10 +104,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setActiveAgentState(name);
 
     if (agent.type === 'remote') {
-      // Remote agent — point to remote URL, use remote token, skip local root config
-      if (agent.remoteUrl) setBaseServerUrl(agent.remoteUrl);
+      // Remote agent — use remote token; serverUrl is computed from agent.remoteUrl
+      // Don't mutate baseServerUrl — fleet endpoints (bus, dashboard) need the local URL
       if (agent.remoteToken) setApiToken(agent.remoteToken);
-      // Don't call kb.config.setAgentRoot for remote agents
       return;
     }
 
@@ -245,11 +252,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // Fleet mode — status comes from fleet, not individual agents
           setFleetStatus(fleetResult.fleet);
           setCliStatus('running');
-          setServerReady(true);
 
-          // Always re-read token (closure may have stale value)
+          // Re-read token BEFORE marking server ready — avoids a render frame
+          // where serverUrl has the /agent/ prefix but apiToken is stale (→ 401)
           const freshToken = await kb.config.getApiToken();
           if (freshToken) setApiToken(freshToken);
+
+          setServerReady(true);
 
           // Synthesize health from fleet data for the viewed agent
           const fleetAgent = fleetResult.fleet.agents?.find(

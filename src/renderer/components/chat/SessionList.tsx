@@ -35,7 +35,7 @@ interface SessionListProps {
 }
 
 export default function SessionList({ currentSessionId, onSelectSession, onNewSession }: SessionListProps) {
-  const { serverUrl, apiToken, serverReady } = useApp();
+  const { serverUrl, apiToken, serverReady, activeAgent } = useApp();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,7 +51,7 @@ export default function SessionList({ currentSessionId, onSelectSession, onNewSe
       }
     } catch {}
     setLoading(false);
-  }, [serverUrl, apiToken, serverReady]);
+  }, [serverUrl, apiToken, serverReady, activeAgent]);
 
   useEffect(() => {
     if (!serverReady) return;

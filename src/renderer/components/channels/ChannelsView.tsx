@@ -11,7 +11,7 @@ interface ChannelInfo { name: string; connected: boolean; verified: boolean | nu
 interface ChannelConfig { telegram?: { bot_token?: string; owner_chat_id?: number }; whatsapp?: { enabled?: boolean }; }
 
 export default function ChannelsView() {
-  const { serverUrl, apiToken } = useApp();
+  const { serverUrl, apiToken, serverReady } = useApp();
   const [channels, setChannels] = useState<ChannelInfo[]>([]);
   const [config, setConfig] = useState<ChannelConfig>({});
   const [loading, setLoading] = useState(true);
@@ -20,6 +20,7 @@ export default function ChannelsView() {
   const [message, setMessage] = useState('');
 
   const loadData = useCallback(async () => {
+    if (!serverReady) return;
     try {
       const [statusData, configData] = await Promise.all([
         manageFetch<{ channels: ChannelInfo[] }>(serverUrl, apiToken, '/channels'),
@@ -30,7 +31,7 @@ export default function ChannelsView() {
       if (configData.channels.telegram?.bot_token) setTelegramToken(configData.channels.telegram.bot_token);
     } catch { /* offline */ }
     setLoading(false);
-  }, [serverUrl, apiToken]);
+  }, [serverUrl, apiToken, serverReady]);
 
   useEffect(() => { loadData(); const t = setInterval(loadData, 15_000); return () => clearInterval(t); }, [loadData]);
 

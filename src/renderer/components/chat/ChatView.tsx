@@ -111,17 +111,6 @@ export default function ChatView() {
     loadMostRecent();
   }, [serverReady, activeAgent]);
 
-  // Save a message to the current session
-  const saveMessage = useCallback(async (sid: string, role: string, content: string, extra?: { toolCalls?: ToolCall[]; memoryUpdates?: string[] }) => {
-    try {
-      await fetch(`${serverUrl}/api/web/sessions/${sid}/messages`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ role, content, toolCalls: extra?.toolCalls, memoryUpdates: extra?.memoryUpdates }),
-      });
-    } catch {}
-  }, [serverUrl, authHeaders]);
-
   // Create a new session on the server
   const createSession = useCallback(async (): Promise<string | null> => {
     try {
@@ -183,10 +172,7 @@ export default function ChatView() {
       if (currentSessionId) setSessionId(currentSessionId);
     }
 
-    // Save user message to session
-    if (currentSessionId) {
-      saveMessage(currentSessionId, 'user', prompt);
-    }
+    // User message is saved server-side by chat-sse handler — no client save needed
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -275,14 +261,7 @@ export default function ChatView() {
         memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
       };
       setMessages(prev => [...prev, assistantMsg]);
-
-      // Save assistant message to session
-      if (currentSessionId) {
-        saveMessage(currentSessionId, 'assistant', fullText, {
-          toolCalls: assistantMsg.toolCalls,
-          memoryUpdates: assistantMsg.memoryUpdates,
-        });
-      }
+      // Assistant message is saved server-side by chat-sse handler — no client save needed
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${(err as Error).message}` }]);

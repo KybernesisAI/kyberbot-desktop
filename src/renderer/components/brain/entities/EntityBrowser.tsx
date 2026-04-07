@@ -56,7 +56,7 @@ function timeAgo(iso: string): string {
 }
 
 export default function EntityBrowser() {
-  const { serverUrl, apiToken } = useApp();
+  const { serverUrl, apiToken, serverReady } = useApp();
   const [entities, setEntities] = useState<Entity[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [context, setContext] = useState<EntityContext | null>(null);
@@ -67,6 +67,7 @@ export default function EntityBrowser() {
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const search = useCallback(async () => {
+    if (!serverReady) return;
     try {
       const params = new URLSearchParams();
       if (query) params.set('q', query);
@@ -83,7 +84,7 @@ export default function EntityBrowser() {
       setEntities(results);
     } catch {}
     setLoading(false);
-  }, [serverUrl, apiToken, query, activeTypes, sort]);
+  }, [serverUrl, apiToken, query, activeTypes, sort, serverReady]);
 
   useEffect(() => {
     clearTimeout(searchTimer.current);
