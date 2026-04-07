@@ -160,11 +160,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setCliStatus('running');
           setServerReady(true);
 
-          // Ensure we have a valid token
-          if (!apiToken) {
-            const token = await kb.config.getApiToken();
-            if (token) setApiToken(token);
-          }
+          // Always re-read token (closure may have stale value)
+          const freshToken = await kb.config.getApiToken();
+          if (freshToken) setApiToken(freshToken);
 
           // Synthesize health from fleet data for the viewed agent
           const fleetAgent = fleetResult.fleet.agents?.find(
@@ -193,8 +191,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setRunningAgentRoot('__fleet__');
           return;
         } else {
-          // Not in fleet mode — clear fleet state if it was set
-          if (fleetStatus) setFleetStatus(null);
+          // Not in fleet mode — always clear (avoids stale closure check)
+          setFleetStatus(null);
         }
 
         // 2. Single-agent mode — poll this agent's state
