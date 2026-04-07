@@ -354,14 +354,11 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent }: {
                 cursor: 'pointer',
               }}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <div
-                  className="status-dot"
-                  style={{
-                    width: '6px', height: '6px', borderRadius: '50%',
-                    backgroundColor: agent.status === 'running' ? '#10b981' : agent.status === 'error' ? '#ef4444' : '#6b7280',
-                  }}
-                />
+              <div className="flex items-center gap-2">
+                <div style={{
+                  width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+                  backgroundColor: agent.status === 'running' ? '#10b981' : agent.status === 'error' ? '#ef4444' : '#6b7280',
+                }} />
                 <span style={{
                   fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600,
                   color: isActive ? 'var(--accent-emerald)' : 'var(--fg-primary)',
@@ -377,41 +374,12 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent }: {
                 }}>
                   {agent.status}
                 </span>
+                {agent.uptime && (
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-muted)' }}>
+                    {agent.uptime}
+                  </span>
+                )}
               </div>
-
-              {/* Agent services */}
-              {agent.services && agent.services.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {agent.services.map((svc) => (
-                    <span key={svc.name} style={{
-                      fontFamily: 'var(--font-mono)', fontSize: '9px',
-                      color: statusColor(svc.status), opacity: 0.8,
-                    }}>
-                      {svc.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Agent channels */}
-              {agent.channels && agent.channels.length > 0 && (
-                <div className="flex gap-2 mt-1">
-                  {agent.channels.map((ch) => (
-                    <span key={ch.name} style={{
-                      fontFamily: 'var(--font-mono)', fontSize: '9px',
-                      color: ch.connected ? 'var(--status-success)' : 'var(--fg-muted)',
-                    }}>
-                      {ch.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {agent.uptime && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-muted)', marginTop: '4px' }}>
-                  up {agent.uptime}
-                </div>
-              )}
             </button>
           );
         })}
