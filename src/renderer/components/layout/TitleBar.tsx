@@ -17,6 +17,7 @@ export default function TitleBar() {
   const [fleetAgents, setFleetAgents] = useState<FleetAgentInfo[]>([]);
   const [loadingFleet, setLoadingFleet] = useState(false);
   const [appUpdate, setAppUpdate] = useState(false);
+  const [appDownloaded, setAppDownloaded] = useState(false);
   const [cliUpdate, setCliUpdate] = useState(false);
   const [updating, setUpdating] = useState<'cli' | 'app' | null>(null);
   const [showRemoteForm, setShowRemoteForm] = useState(false);
@@ -45,11 +46,15 @@ export default function TitleBar() {
       setCliUpdate(s.cliUpdateAvailable);
     });
     // Subscribe to changes
-    const unsub = kb.updater.onStateChange((s: any) => {
+    const unsubState = kb.updater.onStateChange((s: any) => {
       setAppUpdate(s.appUpdateAvailable);
       setCliUpdate(s.cliUpdateAvailable);
     });
-    return unsub;
+    const unsubDownloaded = kb.updater.onDownloaded(() => {
+      setAppDownloaded(true);
+      setUpdating(null);
+    });
+    return () => { unsubState(); unsubDownloaded(); };
   }, []);
 
   // Keep fleetAgents in sync with context agents
@@ -220,30 +225,36 @@ export default function TitleBar() {
           </button>
         )}
         {/* App update badge */}
-        {appUpdate && (
+        {(appUpdate || appDownloaded) && (
           <button
             onClick={async () => {
               if (updating) return;
+              const kb = (window as any).kyberbot;
+              if (appDownloaded) {
+                // Update downloaded — restart to apply
+                kb.updater.quitAndInstall();
+                return;
+              }
               setUpdating('app');
               try {
-                const kb = (window as any).kyberbot;
                 await kb.updater.installAppUpdate();
               } catch {}
-              setUpdating(null);
+              // Don't setUpdating(null) here — onDownloaded callback handles it
             }}
-            title="Desktop app update available"
+            title={appDownloaded ? 'Restart to apply update' : 'Desktop app update available'}
             style={{
               display: 'flex', alignItems: 'center', gap: '3px',
               padding: '2px 6px',
               fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '1px',
               textTransform: 'uppercase',
-              color: '#22d3ee', border: '1px solid #22d3ee',
+              color: appDownloaded ? '#10b981' : '#22d3ee',
+              border: `1px solid ${appDownloaded ? '#10b981' : '#22d3ee'}`,
               background: 'transparent', cursor: updating === 'app' ? 'wait' : 'pointer',
               opacity: updating === 'app' ? 0.5 : 1,
             }}
           >
             <ArrowUp size={8} />
-            {updating === 'app' ? 'Updating...' : 'APP'}
+            {appDownloaded ? 'RESTART' : updating === 'app' ? 'Downloading...' : 'APP'}
           </button>
         )}
         <button

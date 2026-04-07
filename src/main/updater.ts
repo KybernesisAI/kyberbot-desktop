@@ -53,6 +53,10 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
     }
   });
 
+  ipcMain.handle('updater:quitAndInstall', () => {
+    autoUpdater.quitAndInstall();
+  });
+
   ipcMain.handle('updater:updateCli', async () => {
     if (!state.cliUpdateAvailable) return { ok: false, error: 'No update available' };
     try {
@@ -123,6 +127,8 @@ function checkCliUpdate(): void {
       env: { ...process.env, PATH: getFullPath() },
     });
 
+    log.info('CLI update check output:', output.trim().slice(0, 300));
+
     // If output contains indicators of available updates
     const hasUpdate = output.includes('would change') ||
                       output.includes('available') ||
@@ -138,8 +144,8 @@ function checkCliUpdate(): void {
       state.cliUpdateSummary = null;
     }
     pushState();
-  } catch {
-    // kyberbot update --check failed — silently ignore
+  } catch (err) {
+    log.warn('CLI update check failed:', String(err));
   }
 }
 

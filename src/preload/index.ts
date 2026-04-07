@@ -94,6 +94,7 @@ const api = {
       ipcRenderer.on('updater:downloaded', handler);
       return () => ipcRenderer.removeListener('updater:downloaded', handler);
     },
+    quitAndInstall: (): Promise<void> => ipcRenderer.invoke('updater:quitAndInstall'),
   },
 
   onboarding: {
