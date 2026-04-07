@@ -204,8 +204,8 @@ export default function TitleBar() {
               setUpdating('cli');
               try {
                 const kb = (window as any).kyberbot;
-                await kb.updater.updateCli();
-                setCliUpdate(false);
+                const result = await kb.updater.updateCli();
+                if (result?.ok) setCliUpdate(false);
               } catch {}
               setUpdating(null);
             }}

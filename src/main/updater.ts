@@ -62,16 +62,18 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
   ipcMain.handle('updater:updateCli', async () => {
     if (!state.cliUpdateAvailable) return { ok: false, error: 'No update available' };
     try {
-      const result = execSync('kyberbot update', {
+      const shell = process.env.SHELL || '/bin/zsh';
+      const result = execSync(`${shell} -ilc "kyberbot update"`, {
         encoding: 'utf-8',
         timeout: 120_000,
-        env: { ...process.env, PATH: getFullPath() },
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
       state.cliUpdateAvailable = false;
       state.cliUpdateSummary = null;
       pushState();
       return { ok: true, output: result };
     } catch (err) {
+      log.warn('CLI update failed:', String(err).slice(0, 300));
       return { ok: false, error: String(err) };
     }
   });
