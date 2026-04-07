@@ -4,12 +4,48 @@
  */
 
 import { ipcMain, dialog, BrowserWindow } from 'electron';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { homedir } from 'os';
 import * as yaml from 'js-yaml';
 import { config as dotenvParse } from 'dotenv';
 import { IPC, IdentityConfig, EnvConfig } from '../../types/ipc.js';
 import { AppStore } from '../store.js';
+
+/**
+ * Auto-register an agent directory in ~/.kyberbot/registry.yaml if not already present.
+ * Ensures pre-registry agents show up in the fleet dropdown when opened.
+ */
+function ensureRegistered(agentRoot: string): void {
+  try {
+    const identityPath = join(agentRoot, 'identity.yaml');
+    if (!existsSync(identityPath)) return;
+
+    const identity = yaml.load(readFileSync(identityPath, 'utf-8')) as Record<string, any> | null;
+    if (!identity?.agent_name) return;
+
+    const name = (identity.agent_name as string).toLowerCase();
+    const registryDir = join(homedir(), '.kyberbot');
+    const registryPath = join(registryDir, 'registry.yaml');
+
+    interface RegistryData { agents: Record<string, { root: string; registered: string }>; }
+    let registry: RegistryData = { agents: {} };
+    try {
+      const raw = readFileSync(registryPath, 'utf-8');
+      const parsed = yaml.load(raw) as RegistryData | null;
+      if (parsed?.agents) registry = parsed;
+    } catch { /* no registry yet */ }
+
+    // Already registered (by name or by root) — skip
+    if (registry.agents[name]) return;
+    const alreadyByRoot = Object.values(registry.agents).some(a => a.root === agentRoot);
+    if (alreadyByRoot) return;
+
+    if (!existsSync(registryDir)) mkdirSync(registryDir, { recursive: true });
+    registry.agents[name] = { root: agentRoot, registered: new Date().toISOString() };
+    writeFileSync(registryPath, yaml.dump(registry, { lineWidth: 120 }), 'utf-8');
+  } catch { /* non-fatal */ }
+}
 
 export function registerConfigHandlers(store: AppStore): void {
   // Directory picker for selecting agent root
@@ -28,6 +64,7 @@ export function registerConfigHandlers(store: AppStore): void {
 
     if (hasIdentity) {
       store.setAgentRoot(dir);
+      ensureRegistered(dir);
     }
 
     return { path: dir, hasIdentity };
@@ -38,6 +75,7 @@ export function registerConfigHandlers(store: AppStore): void {
 
   ipcMain.handle(IPC.CONFIG_SET_AGENT_ROOT, (_event, path: string) => {
     store.setAgentRoot(path);
+    ensureRegistered(path);
     return { ok: true };
   });
 

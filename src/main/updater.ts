@@ -129,7 +129,7 @@ function checkCliUpdate(): void {
                       output.includes('behind') ||
                       output.includes('new version');
 
-    if (hasUpdate && !output.includes('up to date') && !output.includes('no changes')) {
+    if (hasUpdate && !output.includes('up to date')) {
       state.cliUpdateAvailable = true;
       state.cliUpdateSummary = output.trim().slice(0, 200);
       log.info('CLI update available');
