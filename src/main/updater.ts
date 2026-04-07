@@ -123,50 +123,21 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
 
 async function checkCliUpdate(): Promise<void> {
   try {
-    // Get installed CLI version — try multiple approaches
+    // Get installed CLI version by running inside a login shell.
+    // Electron GUI apps on macOS don't inherit shell PATH (nvm, etc).
+    // Running the command inside `zsh -ilc` gives us the user's full environment.
     let installed = '';
-    const fullPath = getFullPath();
+    const shell = process.env.SHELL || '/bin/zsh';
 
-    // Approach 1: kyberbot --version
     try {
-      installed = execSync('kyberbot --version', {
+      installed = execSync(`${shell} -ilc "kyberbot --version"`, {
         encoding: 'utf-8',
-        timeout: 10_000,
-        env: { ...process.env, PATH: fullPath },
-      }).trim().replace(/^v/, '');
-    } catch {
-      log.info('kyberbot --version failed, trying package.json lookup');
-    }
-
-    // Approach 2: read version from the CLI's package.json directly
-    if (!installed) {
-      try {
-        const { homedir } = require('os');
-        const { join, existsSync, realpathSync } = require('path');
-        const { readFileSync } = require('fs');
-        const home = homedir();
-
-        // Find kyberbot binary and resolve to real path
-        const whichResult = execSync('which kyberbot', {
-          encoding: 'utf-8',
-          timeout: 5_000,
-          env: { ...process.env, PATH: fullPath },
-        }).trim();
-
-        if (whichResult) {
-          // Binary is a symlink to dist/index.cjs — resolve and find package.json
-          const realBin = realpathSync(whichResult);
-          // <pkg>/dist/index.cjs → <pkg>/package.json
-          const pkgPath = join(realBin, '..', '..', 'package.json');
-          if (existsSync(pkgPath)) {
-            const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-            installed = pkg.version || '';
-            log.info('CLI version from package.json:', installed);
-          }
-        }
-      } catch {
-        log.warn('Could not find CLI version from package.json either');
-      }
+        timeout: 15_000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim().replace(/^v/, '').replace(/\n.*$/s, ''); // take first line only
+      log.info('CLI version via login shell:', installed);
+    } catch (err) {
+      log.warn('kyberbot --version via login shell failed:', String(err).slice(0, 200));
     }
 
     if (!installed) {
