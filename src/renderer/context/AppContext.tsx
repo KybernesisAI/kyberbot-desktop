@@ -80,7 +80,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const fleetMode = fleetStatus !== null;
 
   const serverUrl = fleetMode && activeAgent
-    ? `${baseServerUrl}/agent/${encodeURIComponent(activeAgent)}`
+    ? `${baseServerUrl}/agent/${encodeURIComponent(activeAgent.toLowerCase())}`
     : baseServerUrl;
 
   // Switch active agent — no reload
