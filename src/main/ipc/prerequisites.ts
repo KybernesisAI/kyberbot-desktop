@@ -45,6 +45,11 @@ export function registerPrerequisiteHandlers(store: AppStore): void {
 
   // Install a package via npm
   ipcMain.handle('prerequisites:npmInstall', async (_event, pkg: string) => {
+    // KyberBot CLI: monorepo — needs clone + build + link
+    if (pkg === 'kyberbot-cli') {
+      return installKyberbotCli();
+    }
+
     return new Promise((resolve) => {
       const proc = spawn('npm', ['install', '-g', pkg], {
         env: { ...process.env, PATH: fullPath },
@@ -72,6 +77,69 @@ export function registerPrerequisiteHandlers(store: AppStore): void {
       }, 120_000);
     });
   });
+}
+
+/**
+ * Install KyberBot CLI from the GitHub monorepo.
+ * Clones to ~/.kyberbot/source, installs deps, builds, and npm links.
+ */
+async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  const home = process.env.HOME || '';
+  const sourceDir = join(home, '.kyberbot', 'source');
+  const repoUrl = 'https://github.com/KybernesisAI/kyberbot.git';
+  const shellEnv = { ...process.env, PATH: fullPath };
+
+  const run = (cmd: string, cwd?: string): Promise<{ ok: boolean; output: string }> => {
+    return new Promise((resolve) => {
+      const proc = spawn('sh', ['-c', cmd], {
+        cwd,
+        env: shellEnv,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let output = '';
+      proc.stdout?.on('data', (d: Buffer) => { output += d.toString(); });
+      proc.stderr?.on('data', (d: Buffer) => { output += d.toString(); });
+      proc.on('close', (code) => resolve({ ok: code === 0, output }));
+      proc.on('error', (err) => resolve({ ok: false, output: err.message }));
+    });
+  };
+
+  try {
+    let log = '';
+
+    // Clone or pull
+    if (existsSync(join(sourceDir, '.git'))) {
+      const pull = await run('git pull origin main', sourceDir);
+      log += pull.output;
+      if (!pull.ok) return { ok: false, stdout: log, stderr: 'git pull failed' };
+    } else {
+      // Ensure parent dir exists
+      const { mkdirSync } = require('fs');
+      mkdirSync(join(home, '.kyberbot'), { recursive: true });
+      const clone = await run(`git clone ${repoUrl} "${sourceDir}"`);
+      log += clone.output;
+      if (!clone.ok) return { ok: false, stdout: log, stderr: 'git clone failed' };
+    }
+
+    // Install dependencies
+    const install = await run('npm install', sourceDir);
+    log += install.output;
+    if (!install.ok) return { ok: false, stdout: log, stderr: 'npm install failed' };
+
+    // Build
+    const build = await run('npm run build', sourceDir);
+    log += build.output;
+    if (!build.ok) return { ok: false, stdout: log, stderr: 'npm run build failed' };
+
+    // npm link from packages/cli
+    const link = await run('npm link', join(sourceDir, 'packages', 'cli'));
+    log += link.output;
+    if (!link.ok) return { ok: false, stdout: log, stderr: 'npm link failed' };
+
+    return { ok: true, stdout: log, stderr: '' };
+  } catch (err) {
+    return { ok: false, stdout: '', stderr: String(err) };
+  }
 }
 
 function checkNode(): { installed: boolean; version: string | null } {

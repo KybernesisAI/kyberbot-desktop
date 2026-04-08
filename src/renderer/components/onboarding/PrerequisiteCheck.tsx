@@ -114,11 +114,11 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
           notInstalledAction={
             status?.node?.installed ? (
               <button
-                onClick={() => npmInstall('KyberBot', '@kyberbot/cli')}
+                onClick={() => npmInstall('KyberBot', 'kyberbot-cli')}
                 disabled={installing !== null}
                 style={installBtnStyle}
               >
-                {installing === 'KyberBot' ? 'Installing...' : 'Install via npm'}
+                {installing === 'KyberBot' ? 'INSTALLING...' : 'INSTALL'}
               </button>
             ) : (
               <span style={{ fontSize: '9px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Install Node.js first</span>
