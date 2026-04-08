@@ -121,20 +121,27 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
       if (!clone.ok) return { ok: false, stdout: log, stderr: 'git clone failed' };
     }
 
+    // Detect package manager: use pnpm if pnpm-lock.yaml exists, else fall back to npm
+    const usePnpm = existsSync(join(sourceDir, 'pnpm-lock.yaml'));
+    const pm = usePnpm ? 'pnpm' : 'npm';
+
     // Install dependencies
-    const install = await run('npm install', sourceDir);
+    const install = await run(`${pm} install`, sourceDir);
     log += install.output;
-    if (!install.ok) return { ok: false, stdout: log, stderr: 'npm install failed' };
+    if (!install.ok) return { ok: false, stdout: log, stderr: `${pm} install failed` };
 
     // Build
-    const build = await run('npm run build', sourceDir);
+    const build = await run(`${pm} run build`, sourceDir);
     log += build.output;
-    if (!build.ok) return { ok: false, stdout: log, stderr: 'npm run build failed' };
+    if (!build.ok) return { ok: false, stdout: log, stderr: `${pm} run build failed` };
 
-    // npm link from packages/cli
-    const link = await run('npm link', join(sourceDir, 'packages', 'cli'));
+    // Link CLI globally
+    const linkCmd = usePnpm
+      ? 'pnpm link --global'
+      : 'npm link';
+    const link = await run(linkCmd, join(sourceDir, 'packages', 'cli'));
     log += link.output;
-    if (!link.ok) return { ok: false, stdout: log, stderr: 'npm link failed' };
+    if (!link.ok) return { ok: false, stdout: log, stderr: `${linkCmd} failed` };
 
     return { ok: true, stdout: log, stderr: '' };
   } catch (err) {
