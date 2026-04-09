@@ -16,6 +16,8 @@ const api = {
   prerequisites: {
     check: (): Promise<PrerequisiteStatus> => ipcRenderer.invoke(IPC.PREREQ_CHECK),
     openUrl: (url: string): Promise<void> => ipcRenderer.invoke('prerequisites:openUrl', url),
+    installNode: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke('prerequisites:installNode'),
     npmInstall: (pkg: string): Promise<{ ok: boolean; stdout: string; stderr: string }> =>
       ipcRenderer.invoke('prerequisites:npmInstall', pkg),
   },

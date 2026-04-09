@@ -1,6 +1,6 @@
 /**
  * Prerequisite check — detects and helps install all dependencies.
- * Node.js, Docker Desktop, Claude Code CLI, KyberBot CLI.
+ * Node.js, Docker Desktop, Claude Code CLI, KyberBot CLI — all required.
  * Auto-refreshes every 3 seconds. Blocks until all are ready.
  */
 
@@ -34,12 +34,24 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
 
   const openUrl = (url: string) => kb?.prerequisites.openUrl(url);
 
+  const installNode = async () => {
+    setInstalling('Node.js');
+    setInstallLog('Downloading Node.js 22 LTS installer...');
+    const result = await kb.prerequisites.installNode();
+    if (result.ok) {
+      setInstallLog('Node.js installer opened — follow the prompts to install');
+    } else {
+      setInstallLog(`Failed: ${result.error || 'Unknown error'}`);
+    }
+    setTimeout(() => { setInstalling(null); }, 5000);
+  };
+
   const npmInstall = async (label: string, pkg: string) => {
     setInstalling(label);
-    setInstallLog(`Installing ${pkg}...`);
+    setInstallLog(`Installing ${label}...`);
     const result = await kb.prerequisites.npmInstall(pkg);
     if (result.ok) {
-      setInstallLog(`${pkg} installed successfully`);
+      setInstallLog(`${label} installed successfully`);
     } else {
       setInstallLog(`Failed: ${result.stderr || 'Unknown error'}`);
     }
@@ -52,7 +64,7 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
       <span className="section-title" style={{ color: 'var(--accent-emerald)', marginBottom: '24px' }}>{'// PREREQUISITES'}</span>
       <p style={{ fontSize: '13px', textAlign: 'center', maxWidth: '28rem', marginBottom: '32px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>
-        KyberBot Desktop needs a few things installed to run. We'll help you set everything up.
+        KyberBot Desktop needs a few things installed to run. We&apos;ll help you set everything up.
       </p>
 
       <div style={{ width: '100%', maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -64,8 +76,12 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
           version={status?.node?.version}
           description="JavaScript runtime — required for KyberBot and Claude Code"
           notInstalledAction={
-            <button onClick={() => openUrl('https://nodejs.org')} style={linkBtnStyle}>
-              Download from nodejs.org
+            <button
+              onClick={installNode}
+              disabled={installing !== null}
+              style={installBtnStyle}
+            >
+              {installing === 'Node.js' ? 'DOWNLOADING...' : 'INSTALL'}
             </button>
           }
         />
@@ -75,11 +91,11 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
           label="Docker Desktop"
           ok={status?.docker?.installed && status?.docker?.running}
           version={status?.docker?.version}
-          description="Container runtime — runs the ChromaDB vector database"
+          description="Container runtime — runs the ChromaDB memory database"
           detail={status?.docker?.installed && !status?.docker?.running ? 'Installed but not running — open Docker Desktop' : undefined}
           notInstalledAction={
-            <button onClick={() => openUrl('https://www.docker.com/products/docker-desktop/')} style={linkBtnStyle}>
-              Download Docker Desktop
+            <button onClick={() => openUrl('https://www.docker.com/products/docker-desktop/')} style={installBtnStyle}>
+              DOWNLOAD
             </button>
           }
         />
@@ -97,7 +113,7 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
                 disabled={installing !== null}
                 style={installBtnStyle}
               >
-                {installing === 'Claude Code' ? 'Installing...' : 'Install via npm'}
+                {installing === 'Claude Code' ? 'INSTALLING...' : 'INSTALL'}
               </button>
             ) : (
               <span style={{ fontSize: '9px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Install Node.js first</span>
@@ -181,19 +197,6 @@ function PrereqCard({ label, ok, version, description, detail, notInstalledActio
     </div>
   );
 }
-
-const linkBtnStyle: React.CSSProperties = {
-  padding: '4px 10px',
-  fontSize: '9px',
-  letterSpacing: '0.5px',
-  textTransform: 'uppercase',
-  fontFamily: 'var(--font-mono)',
-  border: '1px solid var(--accent-cyan)',
-  color: 'var(--accent-cyan)',
-  background: 'transparent',
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-};
 
 const installBtnStyle: React.CSSProperties = {
   padding: '4px 10px',
