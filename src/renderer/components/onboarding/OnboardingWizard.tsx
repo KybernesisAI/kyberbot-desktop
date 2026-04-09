@@ -43,7 +43,7 @@ const INITIAL: OnboardingData = {
   backupBranch: 'main',
 };
 
-const STEPS = ['Prerequisites', 'Agent Identity', 'About You', 'Claude Code', 'Brain Init', 'Cloud Sync', 'Remote Access', 'Channels', 'Backup', 'Summary'];
+const STEPS = ['Prerequisites', 'Agent Identity', 'About You', 'Claude Code', 'Memory Key', 'Brain Init', 'Cloud Sync', 'Remote Access', 'Channels', 'Backup', 'Summary'];
 
 interface OnboardingWizardProps { onComplete: () => void; }
 
@@ -188,17 +188,49 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                   <input type="password" value={data.apiKey} onChange={e => update({ apiKey: e.target.value })} style={S} placeholder="sk-ant-..." />
                 </div>
               )}
+            </div>
+          )}
 
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+          {/* Step 4: Memory Key (OpenAI for embeddings) */}
+          {step === 4 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ padding: '16px', border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.04)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '16px' }}>🧠</span>
+                  <span style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald)', fontWeight: 600 }}>Required for Memory</span>
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.7' }}>
+                  Your agent&apos;s brain uses <strong style={{ color: 'var(--fg-primary)' }}>OpenAI embeddings</strong> to understand and search memories semantically.
+                  Without this key, your agent won&apos;t be able to remember conversations, recognize people, or search its knowledge base.
+                </p>
+                <p style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300, marginTop: '8px' }}>
+                  Cost: ~$0.02 per million tokens (most agents use less than $0.10/month)
+                </p>
+              </div>
+
+              <div>
                 <label style={L}>OpenAI API Key</label>
-                <input type="password" value={data.openaiKey} onChange={e => update({ openaiKey: e.target.value })} style={S} placeholder="sk-proj-..." />
-                <p style={hint}>Required for semantic memory search (ChromaDB embeddings). Get one at <button onClick={() => kb?.prerequisites.openUrl('https://platform.openai.com/api-keys')} style={link}>platform.openai.com/api-keys</button></p>
+                <input type="password" value={data.openaiKey} onChange={e => update({ openaiKey: e.target.value })} style={{ ...S, borderColor: data.openaiKey ? 'var(--accent-emerald)' : 'var(--status-error)' }} placeholder="sk-proj-..." />
+                {!data.openaiKey && (
+                  <p style={{ fontSize: '10px', color: 'var(--status-error)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>This field is required</p>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <p style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>
+                  <strong style={{ color: 'var(--fg-secondary)' }}>How to get your key:</strong>
+                </p>
+                <div style={{ paddingLeft: '8px', fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.8' }}>
+                  1. Go to <button onClick={() => kb?.prerequisites.openUrl('https://platform.openai.com/api-keys')} style={link}>platform.openai.com/api-keys</button><br />
+                  2. Click &quot;Create new secret key&quot;<br />
+                  3. Copy and paste it above
+                </div>
               </div>
             </div>
           )}
 
-          {/* Step 4: Brain Init */}
-          {step === 4 && (
+          {/* Step 5: Brain Init */}
+          {step === 5 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <p style={{ fontSize: '13px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>
                 The following will be initialized when your agent is created:
@@ -212,8 +244,8 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
             </div>
           )}
 
-          {/* Step 5: Cloud Sync */}
-          {step === 5 && (
+          {/* Step 6: Cloud Sync */}
+          {step === 6 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ padding: '12px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
                 <div style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.6' }}>
@@ -233,8 +265,8 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
             </div>
           )}
 
-          {/* Step 6: Remote Access */}
-          {step === 6 && (
+          {/* Step 7: Remote Access */}
+          {step === 7 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ padding: '12px', border: '1px solid rgba(16,185,129,0.2)', background: 'rgba(16,185,129,0.03)' }}>
                 <div style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.6' }}>
@@ -254,8 +286,8 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
             </div>
           )}
 
-          {/* Step 7: Channels */}
-          {step === 7 && (
+          {/* Step 8: Channels */}
+          {step === 8 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <p style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Optional: connect messaging channels so your agent can communicate outside the desktop app.</p>
               <div>
@@ -273,8 +305,8 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
             </div>
           )}
 
-          {/* Step 8: Backup */}
-          {step === 8 && (
+          {/* Step 9: Backup */}
+          {step === 9 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ padding: '12px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
                 <div style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.6' }}>
@@ -300,8 +332,8 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
             </div>
           )}
 
-          {/* Step 9: Summary */}
-          {step === 9 && (
+          {/* Step 10: Summary */}
+          {step === 10 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <p style={{ fontSize: '13px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, marginBottom: '8px' }}>
                 Review your configuration and launch your agent.
@@ -313,6 +345,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                 ['User', data.userName],
                 ['Timezone', data.timezone],
                 ['Claude Mode', data.claudeMode],
+                ['Memory (OpenAI)', data.openaiKey ? 'Configured' : 'Missing'],
                 ['Kybernesis Cloud', data.kybernesisKey ? 'Connected' : 'Local only'],
                 ['ngrok Tunnel', data.ngrokToken ? 'Configured' : 'Skipped'],
                 ['Telegram', data.telegramToken ? 'Configured' : 'Skipped'],
@@ -334,8 +367,8 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
       {step > 0 && (
         <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)' }}>
           <button onClick={prev} disabled={step <= 1} style={{ padding: '8px 16px', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--border-color)', color: 'var(--fg-secondary)', background: 'transparent', cursor: step <= 1 ? 'default' : 'pointer', opacity: step <= 1 ? 0.3 : 1 }}>Back</button>
-          {step < 9 ? (
-            <button onClick={next} disabled={step === 1 && (!data.agentRoot || !data.agentName)} style={{ padding: '8px 16px', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--accent-emerald)', color: 'var(--accent-emerald)', background: 'transparent', cursor: 'pointer', opacity: step === 1 && (!data.agentRoot || !data.agentName) ? 0.3 : 1 }}>Next</button>
+          {step < 10 ? (
+            <button onClick={next} disabled={(step === 1 && (!data.agentRoot || !data.agentName)) || (step === 4 && !data.openaiKey)} style={{ padding: '8px 16px', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--accent-emerald)', color: 'var(--accent-emerald)', background: 'transparent', cursor: 'pointer', opacity: (step === 1 && (!data.agentRoot || !data.agentName)) || (step === 4 && !data.openaiKey) ? 0.3 : 1 }}>Next</button>
           ) : (
             <button onClick={handleCreate} disabled={creating} style={{ padding: '8px 24px', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--accent-emerald)', color: 'var(--accent-emerald)', background: 'rgba(16,185,129,0.1)', cursor: creating ? 'default' : 'pointer' }}>
               {creating ? 'Creating...' : 'Launch Agent'}
