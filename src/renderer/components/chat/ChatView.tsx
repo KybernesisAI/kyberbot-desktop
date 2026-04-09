@@ -8,6 +8,7 @@ import { useApp } from '../../context/AppContext';
 import MemoryBlocks from './MemoryBlocks';
 import SessionList from './SessionList';
 import MarkdownRenderer from './MarkdownRenderer';
+import BrailleSpinner from './BrailleSpinner';
 
 interface ToolCall {
   id: string;
@@ -363,7 +364,7 @@ export default function ChatView() {
             {/* Status indicator */}
             {streamStatus && !streamText && (
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--accent-emerald)' }} />
+                <BrailleSpinner />
                 <span className="text-[11px]" style={{ color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>
                   {streamStatus}
                 </span>
@@ -374,7 +375,7 @@ export default function ChatView() {
             {streamText && (
               <div className="text-[13px]" style={{ fontFamily: 'var(--font-sans)', color: 'var(--fg-primary)' }}>
                 <MarkdownRenderer content={streamText} />
-                <span className="inline-block w-[2px] h-[14px] ml-0.5 animate-pulse" style={{ background: 'var(--accent-emerald)', verticalAlign: 'text-bottom' }} />
+                <BrailleSpinner className="ml-1 inline-block align-text-bottom text-[11px]" />
               </div>
             )}
           </div>
