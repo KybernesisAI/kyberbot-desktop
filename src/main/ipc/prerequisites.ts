@@ -198,10 +198,32 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
     log += build.output;
     if (!build.ok) return { ok: false, stdout: log, stderr: 'pnpm run build failed' };
 
-    // Link CLI globally
-    const link = await run('pnpm link --global', join(sourceDir, 'packages', 'cli'));
-    log += link.output;
-    if (!link.ok) return { ok: false, stdout: log, stderr: 'pnpm link --global failed' };
+    // Create local bin wrapper instead of global link (avoids sudo/permission issues)
+    const binDir = join(home, '.kyberbot', 'bin');
+    const binPath = join(binDir, 'kyberbot');
+    const cliEntry = join(sourceDir, 'packages', 'cli', 'dist', 'index.js');
+    const { mkdirSync: mkBin, writeFileSync: writeBin, chmodSync } = require('fs');
+    mkBin(binDir, { recursive: true });
+    writeBin(binPath, `#!/usr/bin/env node\nimport("${cliEntry}");\n`, 'utf-8');
+    chmodSync(binPath, '755');
+    log += `Created ${binPath}\n`;
+
+    // Add ~/.kyberbot/bin to shell profile if not already there
+    const profilePaths = [join(home, '.zshrc'), join(home, '.bashrc')];
+    const pathLine = `export PATH="$HOME/.kyberbot/bin:$PATH"`;
+    for (const profilePath of profilePaths) {
+      if (existsSync(profilePath)) {
+        const { readFileSync: readProfile, appendFileSync } = require('fs');
+        const content = readProfile(profilePath, 'utf-8');
+        if (!content.includes('.kyberbot/bin')) {
+          appendFileSync(profilePath, `\n# KyberBot CLI\n${pathLine}\n`);
+          log += `Added PATH to ${profilePath}\n`;
+        }
+      }
+    }
+
+    // Reset cached PATH so the check picks it up immediately
+    _shellPath = null;
 
     return { ok: true, stdout: log, stderr: '' };
   } catch (err) {
