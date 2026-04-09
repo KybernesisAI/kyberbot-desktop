@@ -48,13 +48,39 @@ export function registerOnboardingHandlers(store: AppStore): void {
       if (!existsSync(fullPath)) mkdirSync(fullPath, { recursive: true });
     }
 
+    // Auto-assign a unique port by scanning the registry
+    const assignedPort = (() => {
+      const usedPorts = new Set<number>();
+      try {
+        const registryPath = join(homedir(), '.kyberbot', 'registry.yaml');
+        if (existsSync(registryPath)) {
+          const reg = yaml.load(readFileSync(registryPath, 'utf-8')) as { agents?: Record<string, { root?: string }> } | null;
+          if (reg?.agents) {
+            for (const entry of Object.values(reg.agents)) {
+              try {
+                if (!entry.root) continue;
+                const idPath = join(entry.root, 'identity.yaml');
+                if (existsSync(idPath)) {
+                  const id = yaml.load(readFileSync(idPath, 'utf-8')) as Record<string, any> | null;
+                  usedPorts.add(id?.server?.port ?? 3456);
+                }
+              } catch { /* skip */ }
+            }
+          }
+        }
+      } catch { /* no registry yet */ }
+      let port = 3456;
+      while (usedPorts.has(port)) port++;
+      return port;
+    })();
+
     // Build identity config
     const identity: Record<string, unknown> = {
       agent_name: agentName,
       agent_description: agentDescription,
       timezone,
       heartbeat_interval: '30m',
-      server: { port: 3456 },
+      server: { port: assignedPort },
       claude: { mode: claudeMode, model: 'opus' },
     };
 

@@ -160,17 +160,41 @@ export class LifecycleManager extends EventEmitter {
 
     const port = this.getPortForRoot(agentRoot);
 
-    // Check if server already running on this port
+    // Check if server already running on this port — verify it's the RIGHT agent
     try {
       const res = await fetch(`http://localhost:${port}/health`, { signal: AbortSignal.timeout(2000) });
       if (res.ok) {
-        console.log(`[lifecycle] Server already running on port ${port} — attaching`);
-        const agent = this.ensureAgent(agentRoot, port);
-        agent.status = 'running';
-        agent.attached = true;
-        this.emitAgentStatus(agentRoot);
-        this.startAgentHealthPolling(agentRoot);
-        return;
+        // Verify this is actually our agent, not a different one on the same port
+        let isOurAgent = true;
+        try {
+          const identityRes = await fetch(`http://localhost:${port}/api/web/identity`, {
+            signal: AbortSignal.timeout(2000),
+            headers: this.getAuthHeaders(agentRoot),
+          });
+          if (identityRes.ok) {
+            const identity = await identityRes.json() as { agent_name?: string };
+            const expectedName = this.getAgentName(agentRoot);
+            if (identity.agent_name && expectedName && identity.agent_name.toLowerCase() !== expectedName.toLowerCase()) {
+              console.log(`[lifecycle] Port ${port} is in use by "${identity.agent_name}", not "${expectedName}" — cannot start`);
+              isOurAgent = false;
+              const agent = this.ensureAgent(agentRoot, port);
+              agent.status = 'error';
+              agent.error = `Port ${port} is in use by agent "${identity.agent_name}". Stop it first or change this agent's port in identity.yaml.`;
+              this.emitAgentStatus(agentRoot);
+              return;
+            }
+          }
+        } catch { /* auth failed or no identity endpoint — assume it's ours */ }
+
+        if (isOurAgent) {
+          console.log(`[lifecycle] Server already running on port ${port} — attaching`);
+          const agent = this.ensureAgent(agentRoot, port);
+          agent.status = 'running';
+          agent.attached = true;
+          this.emitAgentStatus(agentRoot);
+          this.startAgentHealthPolling(agentRoot);
+          return;
+        }
       }
     } catch { /* not running */ }
 
@@ -526,6 +550,31 @@ export class LifecycleManager extends EventEmitter {
       const identity = yaml.load(readFileSync(join(root, 'identity.yaml'), 'utf-8'));
       return identity?.server?.port ?? 3456;
     } catch { return 3456; }
+  }
+
+  private getAuthHeaders(root: string): Record<string, string> {
+    try {
+      const envPath = join(root, '.env');
+      const content = readFileSync(envPath, 'utf-8');
+      for (const line of content.split('\n')) {
+        if (line.trim().startsWith('KYBERBOT_API_TOKEN=')) {
+          let token = line.trim().slice('KYBERBOT_API_TOKEN='.length).trim();
+          if ((token.startsWith('"') && token.endsWith('"')) || (token.startsWith("'") && token.endsWith("'"))) {
+            token = token.slice(1, -1);
+          }
+          return { 'Authorization': `Bearer ${token}` };
+        }
+      }
+    } catch { /* no .env */ }
+    return {};
+  }
+
+  private getAgentName(root: string): string | null {
+    try {
+      const yaml = require('js-yaml');
+      const identity = yaml.load(readFileSync(join(root, 'identity.yaml'), 'utf-8'));
+      return identity?.agent_name ?? null;
+    } catch { return null; }
   }
 
   private getServerPort(): number {
