@@ -234,7 +234,7 @@ function TimelineView({ serverUrl, apiToken, serverReady }: { serverUrl: string;
       {loading && <span style={{ fontSize: '11px', color: 'var(--fg-muted)' }}>Loading...</span>}
       {events.map((ev, i) => {
         const isExpanded = expanded.has(i);
-        const content = ev.summary || ev.content || JSON.stringify(ev);
+        const content = ev.summary || ev.content || ev.title || 'No content';
         return (
           <div key={i} onClick={() => toggle(i)} style={{ padding: '8px', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
