@@ -12,59 +12,42 @@ import { tmpdir, arch } from 'os';
 import { IPC, PrerequisiteStatus } from '../../types/ipc.js';
 import { AppStore } from '../store.js';
 
-let _shellPath: string | null = null;
-
+/**
+ * Build a comprehensive PATH by scanning known binary locations.
+ * NO login shell, NO execSync — purely filesystem checks. Never blocks.
+ */
 function getFullPath(): string {
-  if (_shellPath) return _shellPath;
-
-  // Try to get the user's real shell PATH (handles nvm, homebrew, etc)
-  try {
-    const userShell = process.env.SHELL || '/bin/zsh';
-    const resolved = execSync(`${userShell} -ilc "echo $PATH"`, {
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    if (resolved && resolved.length > 10) {
-      // Always prepend our own bin dir + pnpm global (may not be in .zshrc yet)
-      const home = process.env.HOME || '';
-      const ensured = [join(home, '.kyberbot/bin'), join(home, 'Library/pnpm')];
-      _shellPath = [...ensured, ...resolved.split(':')].filter(Boolean).join(':');
-      return _shellPath;
-    }
-  } catch {}
-
-  // Fallback: manually construct
   const home = process.env.HOME || '';
   const existing = process.env.PATH || '';
   const extras = [
     join(home, '.kyberbot/bin'),          // Our own wrapper location
     join(home, 'Library/pnpm'),           // pnpm global bin (macOS)
-    join(home, '.local/bin'),
-    '/usr/local/bin',
-    '/opt/homebrew/bin',
-    join(home, '.npm-global/bin'),
+    join(home, '.pnpm-global/bin'),       // pnpm global bin (alt)
+    join(home, '.local/bin'),             // pip, pipx, user binaries
+    '/usr/local/bin',                     // Node.js .pkg, Homebrew (Intel)
+    '/opt/homebrew/bin',                  // Homebrew (Apple Silicon)
+    join(home, '.npm-global/bin'),        // npm global (custom prefix)
+    '/Applications/Docker.app/Contents/Resources/bin', // Docker Desktop
     '/usr/bin',
     '/bin',
+    '/usr/sbin',
+    '/sbin',
   ];
   const nvmPaths: string[] = [];
   try {
     const nvmDir = join(home, '.nvm/versions/node');
-    for (const v of readdirSync(nvmDir)) {
+    for (const v of readdirSync(nvmDir).sort().reverse()) {
       nvmPaths.push(join(nvmDir, v, 'bin'));
     }
-  } catch {}
-  _shellPath = [...new Set([...nvmPaths, ...extras, ...existing.split(':')])].join(':');
-  return _shellPath;
+  } catch { /* no nvm */ }
+
+  return [...new Set([...nvmPaths, ...extras, ...existing.split(':')])].filter(Boolean).join(':');
 }
 
 const execOpts = () => ({ encoding: 'utf-8' as const, timeout: 10000, env: { ...process.env, PATH: getFullPath() }, stdio: 'pipe' as const });
 
 export function registerPrerequisiteHandlers(store: AppStore): void {
   ipcMain.handle(IPC.PREREQ_CHECK, async (): Promise<PrerequisiteStatus> => {
-    // Reset PATH cache each check — user may have installed something since last check
-    _shellPath = null;
-
     // Run all checks in parallel — all async, never blocks main thread
     const [node, docker, claude, kyberbot] = await Promise.all([
       checkNode(),
@@ -115,7 +98,7 @@ export function registerPrerequisiteHandlers(store: AppStore): void {
       execSync(`open "${pkgPath}"`, { stdio: 'pipe' });
 
       // Reset cached PATH so next check picks up new Node
-      _shellPath = null;
+      // PATH is rebuilt fresh each call — no cache to reset
 
       return { ok: true };
     } catch (err) {
@@ -142,7 +125,7 @@ export function registerPrerequisiteHandlers(store: AppStore): void {
       proc.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
 
       proc.on('close', (code) => {
-        _shellPath = null; // Reset PATH cache after install
+        // PATH is rebuilt fresh each call — no cache to reset // Reset PATH cache after install
         resolve({ ok: code === 0, stdout, stderr });
       });
 
@@ -204,9 +187,26 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
     const hasPnpm = await run('pnpm --version', sourceDir);
     if (!hasPnpm.ok) {
       log += 'Installing pnpm...\n';
+      // Try global install first, fall back to corepack (Node 16+) if permissions fail
+      let pnpmInstalled = false;
       const installPnpm = await run('npm install -g pnpm', sourceDir);
       log += installPnpm.output;
-      if (!installPnpm.ok) return { ok: false, stdout: log, stderr: 'Failed to install pnpm' };
+      pnpmInstalled = installPnpm.ok;
+
+      if (!pnpmInstalled) {
+        log += 'Global install failed, trying corepack...\n';
+        const corepack = await run('corepack enable && corepack prepare pnpm@latest --activate', sourceDir);
+        log += corepack.output;
+        pnpmInstalled = corepack.ok;
+      }
+
+      if (!pnpmInstalled) {
+        // Last resort: install pnpm locally via npx
+        log += 'Corepack failed, trying npx...\n';
+        const npxPnpm = await run('npx pnpm --version', sourceDir);
+        log += npxPnpm.output;
+        if (!npxPnpm.ok) return { ok: false, stdout: log, stderr: 'Failed to install pnpm — try running "npm install -g pnpm" manually in terminal' };
+      }
     }
 
     // Install dependencies
@@ -315,9 +315,12 @@ async function checkDocker(): Promise<PrerequisiteStatus['docker']> {
   const version = await tryBinary('docker', '--version', knownPaths);
   if (!version) return { installed: false, running: false, version: null };
 
-  // Check if running — async, won't block
-  const running = await runAsync('docker ps -q', 10000);
-  return { installed: true, running: running !== null, version };
+  // Check if running — try docker ps first, then check if Docker.app process exists
+  const running = await runAsync('docker ps -q', 8000);
+  if (running !== null) return { installed: true, running: true, version };
+  // Fallback: check if Docker process is running (docker ps may fail while Docker is still starting)
+  const proc = await runAsync('pgrep -x Docker', 3000);
+  return { installed: true, running: proc !== null, version };
 }
 
 async function checkClaude(): Promise<PrerequisiteStatus['claude']> {
