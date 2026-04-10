@@ -401,7 +401,6 @@ fi
 
 # Verify locked binary exists
 if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
-  # Lock file missing or binary gone — find Node
   if [ -d "$HOME/.nvm/versions/node" ]; then
     NODE=$(ls -d "$HOME/.nvm/versions/node"/v*/bin/node 2>/dev/null | sort -V | tail -1)
   fi
@@ -411,21 +410,16 @@ if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
   [ -z "$NODE" ] && echo "Error: Node.js not found" && exit 1
 fi
 
-# Run KyberBot — auto-rebuild better-sqlite3 on MODULE_VERSION mismatch
-OUTPUT=$("$NODE" "$CLI_ENTRY" "$@" 2>&1)
-EXIT_CODE=$?
-
-if echo "$OUTPUT" | grep -q "NODE_MODULE_VERSION"; then
+# Quick sanity check for MODULE_VERSION mismatch (runs --version which is fast)
+CHECK=$("$NODE" "$CLI_ENTRY" --version 2>&1)
+if echo "$CHECK" | grep -q "NODE_MODULE_VERSION"; then
   echo "Rebuilding better-sqlite3 for current Node version..."
   cd "$SOURCE_DIR" && pnpm rebuild better-sqlite3 2>/dev/null
-  # Update lock file to current Node
   echo "$NODE" > "$LOCK_FILE"
-  # Retry
-  exec "$NODE" "$CLI_ENTRY" "$@"
 fi
 
-echo "$OUTPUT"
-exit $EXIT_CODE
+# Run KyberBot — output streams directly (not captured)
+exec "$NODE" "$CLI_ENTRY" "$@"
 `;
 
     writeFileSync(binPath, wrapper, 'utf-8');
