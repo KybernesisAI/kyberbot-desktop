@@ -13,7 +13,7 @@ import { EventEmitter } from 'events';
 import { AppStore } from './store.js';
 import type { HealthData } from '../types/ipc.js';
 
-type CliStatus = 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed';
+type CliStatus = 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'error';
 
 export interface FleetAgentStatus {
   name: string;
@@ -43,6 +43,7 @@ interface AgentProcess {
   attached: boolean;
   restartCount: number;
   port: number;
+  error?: string;
 }
 
 export class LifecycleManager extends EventEmitter {
@@ -584,18 +585,39 @@ export class LifecycleManager extends EventEmitter {
   }
 
   private resolveCliPath(): string {
-    const which = (cmd: string): string | null => {
-      try {
-        const { execSync } = require('child_process');
-        return execSync(`which ${cmd}`, { encoding: 'utf-8', env: { ...process.env, PATH: this.getFullPath() } }).trim();
-      } catch { return null; }
-    };
-    return which('kyberbot') || 'kyberbot';
+    const home = require('os').homedir();
+    const fullPath = this.getFullPath();
+
+    // Check known locations directly — no execSync
+    const candidates = [
+      join(home, '.kyberbot', 'bin', 'kyberbot'),
+      '/usr/local/bin/kyberbot',
+      '/opt/homebrew/bin/kyberbot',
+      join(home, '.local', 'bin', 'kyberbot'),
+      join(home, 'Library', 'pnpm', 'kyberbot'),
+      join(home, '.npm-global', 'bin', 'kyberbot'),
+    ];
+
+    // Check nvm versions
+    try {
+      const nvmDir = join(home, '.nvm', 'versions', 'node');
+      if (existsSync(nvmDir)) {
+        const { readdirSync } = require('fs');
+        for (const v of readdirSync(nvmDir).sort().reverse()) {
+          candidates.push(join(nvmDir, v, 'bin', 'kyberbot'));
+        }
+      }
+    } catch {}
+
+    for (const p of candidates) {
+      if (existsSync(p)) return p;
+    }
+
+    return 'kyberbot'; // last resort — hope it's in PATH
   }
 
   private getFullPath(): string {
-    const { homedir } = require('os');
-    const home = homedir();
+    const home = require('os').homedir();
     const paths: string[] = [];
 
     // nvm versions (newest first)
@@ -609,13 +631,19 @@ export class LifecycleManager extends EventEmitter {
     } catch {}
 
     paths.push(
+      join(home, '.kyberbot', 'bin'),          // Our wrapper
+      join(home, 'Library', 'pnpm'),           // pnpm global
       join(home, '.local', 'bin'),
       '/usr/local/bin',
       '/opt/homebrew/bin',
+      '/Applications/Docker.app/Contents/Resources/bin',
+      join(home, '.npm-global', 'bin'),
       '/usr/bin',
       '/bin',
+      '/usr/sbin',
+      '/sbin',
     );
 
-    return paths.join(':') + ':' + (process.env.PATH || '');
+    return [...new Set([...paths, ...(process.env.PATH || '').split(':')])].filter(Boolean).join(':');
   }
 }
