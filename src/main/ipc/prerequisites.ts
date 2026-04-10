@@ -26,15 +26,27 @@ function getFullPath(): string {
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
     if (resolved && resolved.length > 10) {
-      _shellPath = resolved;
-      return resolved;
+      // Always prepend our own bin dir + pnpm global (may not be in .zshrc yet)
+      const home = process.env.HOME || '';
+      const ensured = [join(home, '.kyberbot/bin'), join(home, 'Library/pnpm')];
+      _shellPath = [...ensured, ...resolved.split(':')].filter(Boolean).join(':');
+      return _shellPath;
     }
   } catch {}
 
   // Fallback: manually construct
   const home = process.env.HOME || '';
   const existing = process.env.PATH || '';
-  const extras = ['/usr/local/bin', '/opt/homebrew/bin', join(home, '.local/bin'), join(home, '.npm-global/bin'), '/usr/bin', '/bin'];
+  const extras = [
+    join(home, '.kyberbot/bin'),          // Our own wrapper location
+    join(home, 'Library/pnpm'),           // pnpm global bin (macOS)
+    join(home, '.local/bin'),
+    '/usr/local/bin',
+    '/opt/homebrew/bin',
+    join(home, '.npm-global/bin'),
+    '/usr/bin',
+    '/bin',
+  ];
   const nvmPaths: string[] = [];
   try {
     const nvmDir = join(home, '.nvm/versions/node');
