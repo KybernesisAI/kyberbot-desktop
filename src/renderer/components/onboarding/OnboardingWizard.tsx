@@ -211,9 +211,6 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
               <div>
                 <label style={L}>OpenAI API Key</label>
                 <input type="password" value={data.openaiKey} onChange={e => update({ openaiKey: e.target.value })} style={{ ...S, borderColor: data.openaiKey ? 'var(--accent-emerald)' : 'var(--status-error)' }} placeholder="sk-proj-..." />
-                {!data.openaiKey && (
-                  <p style={{ fontSize: '10px', color: 'var(--status-error)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>This field is required</p>
-                )}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -226,6 +223,10 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                   3. Copy and paste it above
                 </div>
               </div>
+
+              {!data.openaiKey && (
+                <p style={{ fontSize: '10px', color: 'var(--status-error)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>This key is required to continue</p>
+              )}
             </div>
           )}
 

@@ -20,6 +20,11 @@ const api = {
       ipcRenderer.invoke('prerequisites:installNode'),
     npmInstall: (pkg: string): Promise<{ ok: boolean; stdout: string; stderr: string }> =>
       ipcRenderer.invoke('prerequisites:npmInstall', pkg),
+    onInstallProgress: (callback: (msg: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, msg: string) => callback(msg);
+      ipcRenderer.on('prerequisites:installProgress', handler);
+      return () => ipcRenderer.removeListener('prerequisites:installProgress', handler);
+    },
   },
 
   services: {

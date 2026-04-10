@@ -10,7 +10,7 @@
  * - All checks run in parallel via Promise.all
  */
 
-import { ipcMain, shell } from 'electron';
+import { ipcMain, shell, BrowserWindow } from 'electron';
 import { execSync, spawn } from 'child_process';
 import { existsSync, readdirSync, createWriteStream, readFileSync, writeFileSync, mkdirSync, chmodSync, appendFileSync } from 'fs';
 import { join } from 'path';
@@ -277,7 +277,12 @@ export function registerPrerequisiteHandlers(store: AppStore): void {
   ipcMain.handle('prerequisites:npmInstall', async (_event, pkg: string) => {
     if (pkg === 'kyberbot-cli') return installKyberbotCli();
 
-    const result = await runCmd(`npm install -g ${pkg}`, { timeoutMs: 120_000 });
+    // Try global install, fall back to user-local if permissions fail
+    let result = await runCmd(`npm install -g ${pkg}`, { timeoutMs: 120_000 });
+    if (!result.ok && (result.output.includes('EACCES') || result.output.includes('permission'))) {
+      // Permission denied — try user-local prefix
+      result = await runCmd(`npm install -g --prefix "$HOME/.local" ${pkg}`, { timeoutMs: 120_000 });
+    }
     return { ok: result.ok, stdout: result.output, stderr: result.ok ? '' : result.output };
   });
 }
@@ -286,6 +291,15 @@ export function registerPrerequisiteHandlers(store: AppStore): void {
 // KYBERBOT CLI INSTALLER
 // ═══════════════════════════════════════════════════════════════════════════════
 
+function emitProgress(msg: string): void {
+  try {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('prerequisites:installProgress', msg);
+    }
+  } catch { /* non-fatal */ }
+}
+
 async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stderr: string }> {
   const sourceDir = join(HOME, '.kyberbot', 'source');
   const repoUrl = 'https://github.com/KybernesisAI/kyberbot.git';
@@ -293,6 +307,7 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
 
   const step = async (label: string, cmd: string, cwd?: string, timeoutMs?: number): Promise<boolean> => {
     log += `\n→ ${label}...\n`;
+    emitProgress(label + '...');
     const result = await runCmd(cmd, { cwd, timeoutMs: timeoutMs || 180_000 });
     log += result.output + '\n';
     if (!result.ok) log += `✗ ${label} failed\n`;

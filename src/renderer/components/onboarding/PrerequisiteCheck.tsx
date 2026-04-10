@@ -46,6 +46,15 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
     setTimeout(() => { setInstalling(null); }, 5000);
   };
 
+  // Listen for install progress events
+  useEffect(() => {
+    if (!kb?.prerequisites?.onInstallProgress) return;
+    const unsub = kb.prerequisites.onInstallProgress((msg: string) => {
+      setInstallLog(msg);
+    });
+    return unsub;
+  }, []);
+
   const npmInstall = async (label: string, pkg: string) => {
     setInstalling(label);
     setInstallLog(`Installing ${label}...`);
@@ -53,9 +62,9 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
     if (result.ok) {
       setInstallLog(`${label} installed successfully`);
     } else {
-      setInstallLog(`Failed: ${result.stderr || 'Unknown error'}`);
+      setInstallLog(`Failed: ${result.stderr || result.stdout || 'Unknown error'}`);
     }
-    setTimeout(() => { setInstalling(null); setInstallLog(''); }, 3000);
+    setTimeout(() => { setInstalling(null); setInstallLog(''); }, 5000);
   };
 
   // Node must be >= 20
