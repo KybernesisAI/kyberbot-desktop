@@ -337,7 +337,7 @@ export class LifecycleManager extends EventEmitter {
     if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
     agent.logStream = createWriteStream(join(logDir, 'desktop-cli.log'), { flags: 'a' });
 
-    // Load .env
+    // Load .env — strip surrounding quotes from values
     const agentEnv: Record<string, string> = {};
     try {
       const envContent = readFileSync(join(root, '.env'), 'utf-8');
@@ -345,7 +345,13 @@ export class LifecycleManager extends EventEmitter {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('#')) continue;
         const eqIdx = trimmed.indexOf('=');
-        if (eqIdx > 0) agentEnv[trimmed.slice(0, eqIdx)] = trimmed.slice(eqIdx + 1);
+        if (eqIdx > 0) {
+          let value = trimmed.slice(eqIdx + 1).trim();
+          if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+          }
+          agentEnv[trimmed.slice(0, eqIdx).trim()] = value;
+        }
       }
     } catch {}
 

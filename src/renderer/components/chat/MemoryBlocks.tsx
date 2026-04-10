@@ -60,7 +60,17 @@ export default function MemoryBlocks() {
     for (const [name, data] of results) newBlocks[name as BlockName] = data;
     setBlocks(newBlocks);
     setLoading(false);
-  }, [serverUrl, headers, serverReady, activeAgent]);
+  }, [serverUrl, apiToken, serverReady, activeAgent]);
+
+  // Retry if all blocks are empty (server might not have been ready on first fetch)
+  useEffect(() => {
+    if (!serverReady) return;
+    const allEmpty = BLOCKS.every(name => !blocks[name]?.content);
+    if (allEmpty) {
+      const retry = setTimeout(fetchBlocks, 5000);
+      return () => clearTimeout(retry);
+    }
+  }, [blocks, serverReady]);
 
   useEffect(() => { fetchBlocks(); }, [fetchBlocks]);
 

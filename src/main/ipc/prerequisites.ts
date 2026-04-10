@@ -1,33 +1,42 @@
 /**
  * Prerequisite detection and one-click installation.
- * Node.js, Claude Code CLI, KyberBot CLI are required.
- * Docker Desktop is optional (enables semantic search via ChromaDB).
+ * Node.js, Docker Desktop, Claude Code CLI, KyberBot CLI — all required.
+ *
+ * Design principles:
+ * - NEVER use execSync for binary detection (blocks main thread)
+ * - NEVER use login shells (zsh -ilc hangs with oh-my-zsh etc)
+ * - Check known filesystem paths directly — no PATH guessing
+ * - Lock the Node binary at install time to prevent MODULE_VERSION mismatches
+ * - All checks run in parallel via Promise.all
  */
 
 import { ipcMain, shell } from 'electron';
 import { execSync, spawn } from 'child_process';
-import { existsSync, readdirSync, createWriteStream } from 'fs';
+import { existsSync, readdirSync, createWriteStream, readFileSync, writeFileSync, mkdirSync, chmodSync, appendFileSync } from 'fs';
 import { join } from 'path';
-import { tmpdir, arch } from 'os';
+import { tmpdir, arch, homedir } from 'os';
 import { IPC, PrerequisiteStatus } from '../../types/ipc.js';
 import { AppStore } from '../store.js';
 
+const HOME = homedir();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATH CONSTRUCTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /**
- * Build a comprehensive PATH by scanning known binary locations.
- * NO login shell, NO execSync — purely filesystem checks. Never blocks.
+ * Build PATH from known binary locations. Pure filesystem — no shell, no exec.
  */
-function getFullPath(): string {
-  const home = process.env.HOME || '';
-  const existing = process.env.PATH || '';
+function buildPath(): string {
   const extras = [
-    join(home, '.kyberbot/bin'),          // Our own wrapper location
-    join(home, 'Library/pnpm'),           // pnpm global bin (macOS)
-    join(home, '.pnpm-global/bin'),       // pnpm global bin (alt)
-    join(home, '.local/bin'),             // pip, pipx, user binaries
-    '/usr/local/bin',                     // Node.js .pkg, Homebrew (Intel)
-    '/opt/homebrew/bin',                  // Homebrew (Apple Silicon)
-    join(home, '.npm-global/bin'),        // npm global (custom prefix)
-    '/Applications/Docker.app/Contents/Resources/bin', // Docker Desktop
+    join(HOME, '.kyberbot/bin'),
+    join(HOME, 'Library/pnpm'),
+    join(HOME, '.pnpm-global/bin'),
+    join(HOME, '.local/bin'),
+    '/usr/local/bin',
+    '/opt/homebrew/bin',
+    '/Applications/Docker.app/Contents/Resources/bin',
+    join(HOME, '.npm-global/bin'),
     '/usr/bin',
     '/bin',
     '/usr/sbin',
@@ -35,299 +44,118 @@ function getFullPath(): string {
   ];
   const nvmPaths: string[] = [];
   try {
-    const nvmDir = join(home, '.nvm/versions/node');
+    const nvmDir = join(HOME, '.nvm/versions/node');
     for (const v of readdirSync(nvmDir).sort().reverse()) {
       nvmPaths.push(join(nvmDir, v, 'bin'));
     }
   } catch { /* no nvm */ }
 
-  return [...new Set([...nvmPaths, ...extras, ...existing.split(':')])].filter(Boolean).join(':');
+  return [...new Set([...nvmPaths, ...extras, ...(process.env.PATH || '').split(':')])].filter(Boolean).join(':');
 }
 
-const execOpts = () => ({ encoding: 'utf-8' as const, timeout: 10000, env: { ...process.env, PATH: getFullPath() }, stdio: 'pipe' as const });
-
-export function registerPrerequisiteHandlers(store: AppStore): void {
-  ipcMain.handle(IPC.PREREQ_CHECK, async (): Promise<PrerequisiteStatus> => {
-    // Run all checks in parallel — all async, never blocks main thread
-    const [node, docker, claude, kyberbot] = await Promise.all([
-      checkNode(),
-      checkDocker(),
-      checkClaude(),
-      checkKyberbot(),
-    ]);
-    const agentRoot = checkAgentRoot(store);
-    return { node, docker, claude, kyberbot, agentRoot };
-  });
-
-  // Open external URLs (for download links)
-  ipcMain.handle('prerequisites:openUrl', async (_event, url: string) => {
-    await shell.openExternal(url);
-  });
-
-  // One-click Node.js install — downloads .pkg and opens macOS installer
-  ipcMain.handle('prerequisites:installNode', async () => {
-    try {
-      const nodeArch = arch() === 'arm64' ? 'arm64' : 'x64';
-      // Fetch the latest Node 22 LTS version from nodejs.org
-      const res = await fetch('https://nodejs.org/dist/index.json', { signal: AbortSignal.timeout(10000) });
-      const versions = await res.json() as Array<{ version: string; lts: string | false }>;
-      const lts22 = versions.find(v => v.version.startsWith('v22') && v.lts);
-      if (!lts22) return { ok: false, error: 'Could not find Node 22 LTS version' };
-
-      const ver = lts22.version;
-      const pkgUrl = `https://nodejs.org/dist/${ver}/node-${ver}.pkg`;
-      const pkgPath = join(tmpdir(), `node-${ver}.pkg`);
-
-      // Download the .pkg
-      const dlRes = await fetch(pkgUrl, { signal: AbortSignal.timeout(120000) });
-      if (!dlRes.ok) return { ok: false, error: `Download failed: HTTP ${dlRes.status}` };
-
-      const fileStream = createWriteStream(pkgPath);
-      const reader = dlRes.body?.getReader();
-      if (!reader) return { ok: false, error: 'No response body' };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        fileStream.write(Buffer.from(value));
-      }
-      fileStream.end();
-      await new Promise<void>((resolve) => fileStream.on('finish', resolve));
-
-      // Open the .pkg installer (launches macOS Installer.app)
-      execSync(`open "${pkgPath}"`, { stdio: 'pipe' });
-
-      // Reset cached PATH so next check picks up new Node
-      // PATH is rebuilt fresh each call — no cache to reset
-
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, error: String(err) };
-    }
-  });
-
-  // Install a package via npm (uses login shell for PATH)
-  ipcMain.handle('prerequisites:npmInstall', async (_event, pkg: string) => {
-    // KyberBot CLI: monorepo — needs clone + build + link
-    if (pkg === 'kyberbot-cli') {
-      return installKyberbotCli();
-    }
-
-    return new Promise((resolve) => {
-      const proc = spawn('sh', ['-c', `npm install -g ${pkg}`], {
-        env: { ...process.env, PATH: getFullPath() },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-
-      let stdout = '';
-      let stderr = '';
-      proc.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
-      proc.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
-
-      proc.on('close', (code) => {
-        // PATH is rebuilt fresh each call — no cache to reset // Reset PATH cache after install
-        resolve({ ok: code === 0, stdout, stderr });
-      });
-
-      proc.on('error', (err) => {
-        resolve({ ok: false, stdout: '', stderr: err.message });
-      });
-
-      setTimeout(() => {
-        proc.kill();
-        resolve({ ok: false, stdout, stderr: stderr + '\nInstallation timed out' });
-      }, 120_000);
-    });
-  });
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// ASYNC COMMAND RUNNER
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Install KyberBot CLI from the GitHub monorepo.
- * Clones to ~/.kyberbot/source, installs deps, builds, and npm links.
+ * Run a command async. Never blocks. Returns stdout on success, null on failure.
  */
-async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-  const home = process.env.HOME || '';
-  const sourceDir = join(home, '.kyberbot', 'source');
-  const repoUrl = 'https://github.com/KybernesisAI/kyberbot.git';
-  const run = (cmd: string, cwd?: string): Promise<{ ok: boolean; output: string }> => {
-    return new Promise((resolve) => {
-      const proc = spawn('sh', ['-c', cmd], {
-        cwd: cwd || undefined,
-        env: { ...process.env, PATH: getFullPath(), HOME: home },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      let output = '';
-      proc.stdout?.on('data', (d: Buffer) => { output += d.toString(); });
-      proc.stderr?.on('data', (d: Buffer) => { output += d.toString(); });
-      proc.on('close', (code) => resolve({ ok: code === 0, output }));
-      proc.on('error', (err) => resolve({ ok: false, output: err.message }));
-      // Timeout per command — 3 minutes max
-      setTimeout(() => { try { proc.kill(); } catch {} resolve({ ok: false, output: output + '\nCommand timed out' }); }, 180_000);
-    });
-  };
-
-  try {
-    let log = '';
-
-    // Clone or pull
-    if (existsSync(join(sourceDir, '.git'))) {
-      const pull = await run('git pull origin main', sourceDir);
-      log += pull.output;
-      if (!pull.ok) return { ok: false, stdout: log, stderr: 'git pull failed' };
-    } else {
-      // Ensure parent dir exists
-      const { mkdirSync } = require('fs');
-      mkdirSync(join(home, '.kyberbot'), { recursive: true });
-      const clone = await run(`git clone ${repoUrl} "${sourceDir}"`);
-      log += clone.output;
-      if (!clone.ok) return { ok: false, stdout: log, stderr: 'git clone failed' };
-    }
-
-    // Ensure pnpm is available (monorepo requires it)
-    const hasPnpm = await run('pnpm --version', sourceDir);
-    if (!hasPnpm.ok) {
-      log += 'Installing pnpm...\n';
-      // Try global install first, fall back to corepack (Node 16+) if permissions fail
-      let pnpmInstalled = false;
-      const installPnpm = await run('npm install -g pnpm', sourceDir);
-      log += installPnpm.output;
-      pnpmInstalled = installPnpm.ok;
-
-      if (!pnpmInstalled) {
-        log += 'Global install failed, trying corepack...\n';
-        const corepack = await run('corepack enable && corepack prepare pnpm@latest --activate', sourceDir);
-        log += corepack.output;
-        pnpmInstalled = corepack.ok;
-      }
-
-      if (!pnpmInstalled) {
-        // Last resort: install pnpm locally via npx
-        log += 'Corepack failed, trying npx...\n';
-        const npxPnpm = await run('npx pnpm --version', sourceDir);
-        log += npxPnpm.output;
-        if (!npxPnpm.ok) return { ok: false, stdout: log, stderr: 'Failed to install pnpm — try running "npm install -g pnpm" manually in terminal' };
-      }
-    }
-
-    // Install dependencies
-    const install = await run('pnpm install', sourceDir);
-    log += install.output;
-    if (!install.ok) return { ok: false, stdout: log, stderr: 'pnpm install failed' };
-
-    // Build
-    const build = await run('pnpm run build', sourceDir);
-    log += build.output;
-    if (!build.ok) return { ok: false, stdout: log, stderr: 'pnpm run build failed' };
-
-    // Create local bin wrapper (bash script that finds node reliably)
-    const binDir = join(home, '.kyberbot', 'bin');
-    const binPath = join(binDir, 'kyberbot');
-    const cliEntry = join(sourceDir, 'packages', 'cli', 'dist', 'index.js');
-    const { mkdirSync: mkBin, writeFileSync: writeBin, chmodSync } = require('fs');
-    mkBin(binDir, { recursive: true });
-
-    // Bash wrapper that finds node from nvm, /usr/local/bin, or PATH
-    const wrapper = [
-      '#!/bin/bash',
-      '# KyberBot CLI wrapper — installed by KyberBot Desktop',
-      'NODE=""',
-      '# Check nvm first',
-      `if [ -d "$HOME/.nvm/versions/node" ]; then`,
-      `  NODE=$(ls -d "$HOME/.nvm/versions/node"/v*/bin/node 2>/dev/null | sort -V | tail -1)`,
-      'fi',
-      '# Fall back to standard locations',
-      '[ -z "$NODE" ] && [ -x /usr/local/bin/node ] && NODE=/usr/local/bin/node',
-      '[ -z "$NODE" ] && [ -x /opt/homebrew/bin/node ] && NODE=/opt/homebrew/bin/node',
-      '[ -z "$NODE" ] && NODE=$(which node 2>/dev/null)',
-      '[ -z "$NODE" ] && echo "Error: Node.js not found" && exit 1',
-      `exec "$NODE" "${cliEntry}" "$@"`,
-    ].join('\n');
-
-    writeBin(binPath, wrapper + '\n', 'utf-8');
-    chmodSync(binPath, '755');
-    log += `Created ${binPath}\n`;
-
-    // Verify the wrapper actually works
-    const verify = await run(`"${binPath}" --version`, undefined);
-    if (!verify.ok) {
-      log += `WARNING: Wrapper created but verification failed: ${verify.output}\n`;
-      return { ok: false, stdout: log, stderr: 'KyberBot CLI installed but failed to run — check Node.js installation' };
-    }
-    log += `Verified: ${verify.output.trim()}\n`;
-
-    // Add ~/.kyberbot/bin to shell profiles if not already there
-    const profilePaths = [join(home, '.zshrc'), join(home, '.bashrc'), join(home, '.bash_profile')];
-    const pathLine = `export PATH="$HOME/.kyberbot/bin:$PATH"`;
-    for (const profilePath of profilePaths) {
-      if (existsSync(profilePath)) {
-        const { readFileSync: readProfile, appendFileSync } = require('fs');
-        const content = readProfile(profilePath, 'utf-8');
-        if (!content.includes('.kyberbot/bin')) {
-          appendFileSync(profilePath, `\n# KyberBot CLI\n${pathLine}\n`);
-          log += `Added PATH to ${profilePath}\n`;
-        }
-      }
-    }
-
-    // PATH is rebuilt fresh each call — no cache to reset
-
-    return { ok: true, stdout: log, stderr: '' };
-  } catch (err) {
-    return { ok: false, stdout: '', stderr: String(err) };
-  }
-}
-
-/**
- * Run a command asynchronously with a timeout. Never blocks the main thread.
- */
-function runAsync(cmd: string, timeoutMs: number = 8000): Promise<string | null> {
+function runCmd(cmd: string, opts: { cwd?: string; timeoutMs?: number; env?: Record<string, string> } = {}): Promise<{ ok: boolean; output: string }> {
   return new Promise((resolve) => {
     const proc = spawn('sh', ['-c', cmd], {
-      env: { ...process.env, PATH: getFullPath() },
+      cwd: opts.cwd,
+      env: { ...process.env, PATH: buildPath(), HOME, ...opts.env },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let stdout = '';
-    proc.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
-    proc.on('close', (code) => resolve(code === 0 ? stdout.trim() : null));
-    proc.on('error', () => resolve(null));
-    setTimeout(() => { try { proc.kill(); } catch {} resolve(null); }, timeoutMs);
+    let output = '';
+    proc.stdout?.on('data', (d: Buffer) => { output += d.toString(); });
+    proc.stderr?.on('data', (d: Buffer) => { output += d.toString(); });
+    proc.on('close', (code) => resolve({ ok: code === 0, output: output.trim() }));
+    proc.on('error', (err) => resolve({ ok: false, output: err.message }));
+    const timeout = opts.timeoutMs || 30_000;
+    setTimeout(() => { try { proc.kill(); } catch {} resolve({ ok: false, output: output + '\nCommand timed out' }); }, timeout);
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// NODE BINARY RESOLUTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /**
- * Try running a version check at known paths, then fall back to PATH.
- * Fully async — never blocks the main thread.
+ * Find the best Node.js binary. Returns absolute path or null.
+ * Prefers Node 20-24 (our supported range). Checks nvm, /usr/local, homebrew.
  */
-async function tryBinary(name: string, versionFlag: string, knownPaths: string[]): Promise<string | null> {
-  // Try each known path directly (no PATH dependency, no shell)
-  for (const binPath of knownPaths) {
-    if (existsSync(binPath)) {
-      const result = await runAsync(`"${binPath}" ${versionFlag}`, 5000);
-      if (result) return result.split('\n').pop()?.trim() || result;
+function findNodeBinary(): string | null {
+  const candidates: string[] = [];
+
+  // nvm versions — prefer 22, then 20, then newest
+  try {
+    const nvmDir = join(HOME, '.nvm/versions/node');
+    const versions = readdirSync(nvmDir).sort().reverse();
+    // Prefer v22 LTS
+    const v22 = versions.find(v => v.startsWith('v22'));
+    if (v22) candidates.push(join(nvmDir, v22, 'bin/node'));
+    const v20 = versions.find(v => v.startsWith('v20'));
+    if (v20) candidates.push(join(nvmDir, v20, 'bin/node'));
+    // Then all others
+    for (const v of versions) {
+      candidates.push(join(nvmDir, v, 'bin/node'));
+    }
+  } catch { /* no nvm */ }
+
+  // Standard locations
+  candidates.push('/usr/local/bin/node', '/opt/homebrew/bin/node');
+
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
+/**
+ * Get the Node binary that was used to build the CLI (locked at install time).
+ * Falls back to findNodeBinary() if no lock file exists.
+ */
+function getLockedNodeBinary(): string | null {
+  const lockFile = join(HOME, '.kyberbot', 'node_path');
+  try {
+    const locked = readFileSync(lockFile, 'utf-8').trim();
+    if (existsSync(locked)) return locked;
+  } catch { /* no lock file */ }
+  return findNodeBinary();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BINARY DETECTION (fully async, never blocks)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function checkBinary(knownPaths: string[], name: string, versionFlag: string): Promise<string | null> {
+  // Check known paths first (instant filesystem check + async exec)
+  for (const p of knownPaths) {
+    if (existsSync(p)) {
+      const result = await runCmd(`"${p}" ${versionFlag}`, { timeoutMs: 8000 });
+      if (result.ok && result.output) {
+        return result.output.split('\n').pop()?.trim() || result.output;
+      }
     }
   }
-
-  // Fall back to PATH-based check
-  const result = await runAsync(`${name} ${versionFlag}`, 5000);
-  if (result) return result.split('\n').pop()?.trim() || result;
-
+  // Fall back to PATH
+  const result = await runCmd(`${name} ${versionFlag}`, { timeoutMs: 8000 });
+  if (result.ok && result.output) {
+    return result.output.split('\n').pop()?.trim() || result.output;
+  }
   return null;
 }
 
 async function checkNode(): Promise<{ installed: boolean; version: string | null }> {
-  const home = process.env.HOME || '';
-  const knownPaths = [
-    '/usr/local/bin/node',
-    '/opt/homebrew/bin/node',
-  ];
+  const knownPaths = ['/usr/local/bin/node', '/opt/homebrew/bin/node'];
   try {
-    const nvmDir = join(home, '.nvm/versions/node');
+    const nvmDir = join(HOME, '.nvm/versions/node');
     for (const v of readdirSync(nvmDir).sort().reverse()) {
       knownPaths.push(join(nvmDir, v, 'bin/node'));
     }
-  } catch { /* no nvm */ }
-
-  const version = await tryBinary('node', '--version', knownPaths);
+  } catch {}
+  const version = await checkBinary(knownPaths, 'node', '--version');
   return { installed: !!version, version };
 }
 
@@ -337,54 +165,51 @@ async function checkDocker(): Promise<PrerequisiteStatus['docker']> {
     '/opt/homebrew/bin/docker',
     '/Applications/Docker.app/Contents/Resources/bin/docker',
   ];
-  const version = await tryBinary('docker', '--version', knownPaths);
+  const version = await checkBinary(knownPaths, 'docker', '--version');
   if (!version) return { installed: false, running: false, version: null };
 
-  // Check if running — try docker ps first, then check if Docker.app process exists
-  const running = await runAsync('docker ps -q', 8000);
-  if (running !== null) return { installed: true, running: true, version };
-  // Fallback: check if Docker process is running (docker ps may fail while Docker is still starting)
-  const proc = await runAsync('pgrep -x Docker', 3000);
-  return { installed: true, running: proc !== null, version };
+  // Check if daemon is running — docker ps is fast when daemon is up
+  const ps = await runCmd('docker ps -q', { timeoutMs: 8000 });
+  if (ps.ok) return { installed: true, running: true, version };
+
+  // Fallback: check if Docker Desktop process is running (daemon might be starting)
+  const pgrep = await runCmd('pgrep -x Docker', { timeoutMs: 3000 });
+  return { installed: true, running: pgrep.ok, version };
 }
 
 async function checkClaude(): Promise<PrerequisiteStatus['claude']> {
-  const home = process.env.HOME || '';
   const knownPaths = [
     '/usr/local/bin/claude',
     '/opt/homebrew/bin/claude',
-    join(home, '.local/bin/claude'),
-    join(home, '.npm-global/bin/claude'),
+    join(HOME, '.local/bin/claude'),
+    join(HOME, '.npm-global/bin/claude'),
   ];
   try {
-    const nvmDir = join(home, '.nvm/versions/node');
+    const nvmDir = join(HOME, '.nvm/versions/node');
     for (const v of readdirSync(nvmDir).sort().reverse()) {
       knownPaths.push(join(nvmDir, v, 'bin/claude'));
     }
-  } catch { /* no nvm */ }
-
-  const version = await tryBinary('claude', '--version', knownPaths);
+  } catch {}
+  const version = await checkBinary(knownPaths, 'claude', '--version');
   return { installed: !!version, version };
 }
 
 async function checkKyberbot(): Promise<{ installed: boolean; version: string | null }> {
-  const home = process.env.HOME || '';
   const knownPaths = [
-    join(home, '.kyberbot/bin/kyberbot'),
+    join(HOME, '.kyberbot/bin/kyberbot'),
     '/usr/local/bin/kyberbot',
     '/opt/homebrew/bin/kyberbot',
-    join(home, '.local/bin/kyberbot'),
-    join(home, 'Library/pnpm/kyberbot'),
-    join(home, '.npm-global/bin/kyberbot'),
+    join(HOME, '.local/bin/kyberbot'),
+    join(HOME, 'Library/pnpm/kyberbot'),
+    join(HOME, '.npm-global/bin/kyberbot'),
   ];
   try {
-    const nvmDir = join(home, '.nvm/versions/node');
+    const nvmDir = join(HOME, '.nvm/versions/node');
     for (const v of readdirSync(nvmDir).sort().reverse()) {
       knownPaths.push(join(nvmDir, v, 'bin/kyberbot'));
     }
-  } catch { /* no nvm */ }
-
-  const version = await tryBinary('kyberbot', '--version', knownPaths);
+  } catch {}
+  const version = await checkBinary(knownPaths, 'kyberbot', '--version');
   return { installed: !!version, version };
 }
 
@@ -393,4 +218,230 @@ function checkAgentRoot(store: AppStore): PrerequisiteStatus['agentRoot'] {
   if (!path) return { configured: false, path: null, hasIdentity: false };
   const hasIdentity = existsSync(join(path, 'identity.yaml'));
   return { configured: true, path, hasIdentity };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IPC HANDLERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function registerPrerequisiteHandlers(store: AppStore): void {
+  // ── Prerequisite check (runs every 3s from renderer) ──
+  ipcMain.handle(IPC.PREREQ_CHECK, async (): Promise<PrerequisiteStatus> => {
+    const [node, docker, claude, kyberbot] = await Promise.all([
+      checkNode(), checkDocker(), checkClaude(), checkKyberbot(),
+    ]);
+    const agentRoot = checkAgentRoot(store);
+    return { node, docker, claude, kyberbot, agentRoot };
+  });
+
+  // ── Open external URL ──
+  ipcMain.handle('prerequisites:openUrl', async (_event, url: string) => {
+    await shell.openExternal(url);
+  });
+
+  // ── Install Node.js (downloads .pkg, opens macOS installer) ──
+  ipcMain.handle('prerequisites:installNode', async () => {
+    try {
+      const nodeArch = arch() === 'arm64' ? 'arm64' : 'x64';
+      const res = await fetch('https://nodejs.org/dist/index.json', { signal: AbortSignal.timeout(10000) });
+      const versions = await res.json() as Array<{ version: string; lts: string | false }>;
+      const lts22 = versions.find(v => v.version.startsWith('v22') && v.lts);
+      if (!lts22) return { ok: false, error: 'Could not find Node 22 LTS version' };
+
+      const ver = lts22.version;
+      const pkgUrl = `https://nodejs.org/dist/${ver}/node-${ver}.pkg`;
+      const pkgPath = join(tmpdir(), `node-${ver}.pkg`);
+
+      const dlRes = await fetch(pkgUrl, { signal: AbortSignal.timeout(120000) });
+      if (!dlRes.ok) return { ok: false, error: `Download failed: HTTP ${dlRes.status}` };
+
+      const fileStream = createWriteStream(pkgPath);
+      const reader = dlRes.body?.getReader();
+      if (!reader) return { ok: false, error: 'No response body' };
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fileStream.write(Buffer.from(value));
+      }
+      fileStream.end();
+      await new Promise<void>((resolve) => fileStream.on('finish', resolve));
+
+      execSync(`open "${pkgPath}"`, { stdio: 'pipe' });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  });
+
+  // ── Install npm package (Claude Code) ──
+  ipcMain.handle('prerequisites:npmInstall', async (_event, pkg: string) => {
+    if (pkg === 'kyberbot-cli') return installKyberbotCli();
+
+    const result = await runCmd(`npm install -g ${pkg}`, { timeoutMs: 120_000 });
+    return { ok: result.ok, stdout: result.output, stderr: result.ok ? '' : result.output };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// KYBERBOT CLI INSTALLER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  const sourceDir = join(HOME, '.kyberbot', 'source');
+  const repoUrl = 'https://github.com/KybernesisAI/kyberbot.git';
+  let log = '';
+
+  const step = async (label: string, cmd: string, cwd?: string, timeoutMs?: number): Promise<boolean> => {
+    log += `\n→ ${label}...\n`;
+    const result = await runCmd(cmd, { cwd, timeoutMs: timeoutMs || 180_000 });
+    log += result.output + '\n';
+    if (!result.ok) log += `✗ ${label} failed\n`;
+    return result.ok;
+  };
+
+  try {
+    // ── Step 1: Find Node ──
+    const nodeBin = findNodeBinary();
+    if (!nodeBin) {
+      return { ok: false, stdout: log, stderr: 'Node.js not found. Install Node.js first.' };
+    }
+    log += `Using Node: ${nodeBin}\n`;
+
+    // Verify Node version is in our supported range (20-24)
+    const nodeVersionResult = await runCmd(`"${nodeBin}" --version`, { timeoutMs: 5000 });
+    if (nodeVersionResult.ok) {
+      const match = nodeVersionResult.output.match(/v(\d+)/);
+      const major = match ? parseInt(match[1]) : 0;
+      if (major < 20 || major >= 25) {
+        return { ok: false, stdout: log, stderr: `Node ${nodeVersionResult.output.trim()} is not supported. Install Node 20 or 22 LTS.` };
+      }
+      log += `Node version: ${nodeVersionResult.output.trim()} ✓\n`;
+    }
+
+    // ── Step 2: Clone or pull ──
+    mkdirSync(join(HOME, '.kyberbot'), { recursive: true });
+    if (existsSync(join(sourceDir, '.git'))) {
+      if (!await step('Pulling latest code', 'git pull origin main', sourceDir)) {
+        return { ok: false, stdout: log, stderr: 'git pull failed' };
+      }
+    } else {
+      if (!await step('Cloning KyberBot repository', `git clone ${repoUrl} "${sourceDir}"`)) {
+        return { ok: false, stdout: log, stderr: 'git clone failed' };
+      }
+    }
+
+    // ── Step 3: Ensure pnpm ──
+    const hasPnpm = await runCmd('pnpm --version', { timeoutMs: 5000 });
+    if (!hasPnpm.ok) {
+      // Try npm install -g pnpm
+      if (!await step('Installing pnpm via npm', 'npm install -g pnpm')) {
+        // Try corepack
+        if (!await step('Installing pnpm via corepack', 'corepack enable && corepack prepare pnpm@latest --activate')) {
+          return { ok: false, stdout: log, stderr: 'Failed to install pnpm. Try running "npm install -g pnpm" in terminal.' };
+        }
+      }
+    } else {
+      log += `pnpm: ${hasPnpm.output.trim()} ✓\n`;
+    }
+
+    // ── Step 4: Install dependencies ──
+    if (!await step('Installing dependencies', 'pnpm install', sourceDir, 300_000)) {
+      return { ok: false, stdout: log, stderr: 'pnpm install failed' };
+    }
+
+    // ── Step 5: Build ──
+    if (!await step('Building KyberBot CLI', 'pnpm run build', sourceDir, 120_000)) {
+      return { ok: false, stdout: log, stderr: 'Build failed' };
+    }
+
+    // ── Step 6: Lock the Node binary ──
+    // Save the exact Node path used during this build.
+    // The wrapper will use THIS binary, preventing MODULE_VERSION mismatches.
+    const lockFile = join(HOME, '.kyberbot', 'node_path');
+    writeFileSync(lockFile, nodeBin, 'utf-8');
+    log += `Locked Node binary: ${nodeBin}\n`;
+
+    // ── Step 7: Create bash wrapper ──
+    const binDir = join(HOME, '.kyberbot', 'bin');
+    const binPath = join(binDir, 'kyberbot');
+    const cliEntry = join(sourceDir, 'packages', 'cli', 'dist', 'index.js');
+    mkdirSync(binDir, { recursive: true });
+
+    // The wrapper uses the LOCKED Node binary — the same one that compiled better-sqlite3.
+    // If the locked binary is missing, it falls back to discovery.
+    // If there's a MODULE_VERSION mismatch, it auto-rebuilds better-sqlite3.
+    const wrapper = `#!/bin/bash
+# KyberBot CLI — installed by KyberBot Desktop
+# Node binary is locked to the version used during build to prevent
+# MODULE_VERSION mismatches with better-sqlite3.
+
+LOCK_FILE="$HOME/.kyberbot/node_path"
+CLI_ENTRY="${cliEntry}"
+SOURCE_DIR="${sourceDir}"
+
+# Read locked Node binary
+if [ -f "$LOCK_FILE" ]; then
+  NODE=$(cat "$LOCK_FILE")
+fi
+
+# Verify locked binary exists
+if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
+  # Lock file missing or binary gone — find Node
+  if [ -d "$HOME/.nvm/versions/node" ]; then
+    NODE=$(ls -d "$HOME/.nvm/versions/node"/v*/bin/node 2>/dev/null | sort -V | tail -1)
+  fi
+  [ -z "$NODE" ] && [ -x /usr/local/bin/node ] && NODE=/usr/local/bin/node
+  [ -z "$NODE" ] && [ -x /opt/homebrew/bin/node ] && NODE=/opt/homebrew/bin/node
+  [ -z "$NODE" ] && NODE=$(which node 2>/dev/null)
+  [ -z "$NODE" ] && echo "Error: Node.js not found" && exit 1
+fi
+
+# Run KyberBot — auto-rebuild better-sqlite3 on MODULE_VERSION mismatch
+OUTPUT=$("$NODE" "$CLI_ENTRY" "$@" 2>&1)
+EXIT_CODE=$?
+
+if echo "$OUTPUT" | grep -q "NODE_MODULE_VERSION"; then
+  echo "Rebuilding better-sqlite3 for current Node version..."
+  cd "$SOURCE_DIR" && pnpm rebuild better-sqlite3 2>/dev/null
+  # Update lock file to current Node
+  echo "$NODE" > "$LOCK_FILE"
+  # Retry
+  exec "$NODE" "$CLI_ENTRY" "$@"
+fi
+
+echo "$OUTPUT"
+exit $EXIT_CODE
+`;
+
+    writeFileSync(binPath, wrapper, 'utf-8');
+    chmodSync(binPath, '755');
+    log += `Created wrapper: ${binPath}\n`;
+
+    // ── Step 8: Add to shell profiles ──
+    const profilePaths = [join(HOME, '.zshrc'), join(HOME, '.bashrc'), join(HOME, '.bash_profile')];
+    const pathLine = `export PATH="$HOME/.kyberbot/bin:$PATH"`;
+    for (const profilePath of profilePaths) {
+      try {
+        if (existsSync(profilePath)) {
+          const content = readFileSync(profilePath, 'utf-8');
+          if (!content.includes('.kyberbot/bin')) {
+            appendFileSync(profilePath, `\n# KyberBot CLI\n${pathLine}\n`);
+            log += `Added to PATH: ${profilePath}\n`;
+          }
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    // ── Step 9: Verify ──
+    const verify = await runCmd(`"${binPath}" --version`, { timeoutMs: 15000 });
+    if (!verify.ok) {
+      log += `Verification failed: ${verify.output}\n`;
+      return { ok: false, stdout: log, stderr: 'KyberBot CLI installed but failed to run. Check the log for details.' };
+    }
+    log += `\n✓ KyberBot CLI ${verify.output.trim()} installed successfully\n`;
+
+    return { ok: true, stdout: log, stderr: '' };
+  } catch (err) {
+    return { ok: false, stdout: log, stderr: String(err) };
+  }
 }
