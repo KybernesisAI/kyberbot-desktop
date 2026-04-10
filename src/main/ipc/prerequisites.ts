@@ -219,18 +219,44 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
     log += build.output;
     if (!build.ok) return { ok: false, stdout: log, stderr: 'pnpm run build failed' };
 
-    // Create local bin wrapper instead of global link (avoids sudo/permission issues)
+    // Create local bin wrapper (bash script that finds node reliably)
     const binDir = join(home, '.kyberbot', 'bin');
     const binPath = join(binDir, 'kyberbot');
     const cliEntry = join(sourceDir, 'packages', 'cli', 'dist', 'index.js');
     const { mkdirSync: mkBin, writeFileSync: writeBin, chmodSync } = require('fs');
     mkBin(binDir, { recursive: true });
-    writeBin(binPath, `#!/usr/bin/env node\nimport("${cliEntry}");\n`, 'utf-8');
+
+    // Bash wrapper that finds node from nvm, /usr/local/bin, or PATH
+    const wrapper = [
+      '#!/bin/bash',
+      '# KyberBot CLI wrapper — installed by KyberBot Desktop',
+      'NODE=""',
+      '# Check nvm first',
+      `if [ -d "$HOME/.nvm/versions/node" ]; then`,
+      `  NODE=$(ls -d "$HOME/.nvm/versions/node"/v*/bin/node 2>/dev/null | sort -V | tail -1)`,
+      'fi',
+      '# Fall back to standard locations',
+      '[ -z "$NODE" ] && [ -x /usr/local/bin/node ] && NODE=/usr/local/bin/node',
+      '[ -z "$NODE" ] && [ -x /opt/homebrew/bin/node ] && NODE=/opt/homebrew/bin/node',
+      '[ -z "$NODE" ] && NODE=$(which node 2>/dev/null)',
+      '[ -z "$NODE" ] && echo "Error: Node.js not found" && exit 1',
+      `exec "$NODE" "${cliEntry}" "$@"`,
+    ].join('\n');
+
+    writeBin(binPath, wrapper + '\n', 'utf-8');
     chmodSync(binPath, '755');
     log += `Created ${binPath}\n`;
 
-    // Add ~/.kyberbot/bin to shell profile if not already there
-    const profilePaths = [join(home, '.zshrc'), join(home, '.bashrc')];
+    // Verify the wrapper actually works
+    const verify = await run(`"${binPath}" --version`, undefined);
+    if (!verify.ok) {
+      log += `WARNING: Wrapper created but verification failed: ${verify.output}\n`;
+      return { ok: false, stdout: log, stderr: 'KyberBot CLI installed but failed to run — check Node.js installation' };
+    }
+    log += `Verified: ${verify.output.trim()}\n`;
+
+    // Add ~/.kyberbot/bin to shell profiles if not already there
+    const profilePaths = [join(home, '.zshrc'), join(home, '.bashrc'), join(home, '.bash_profile')];
     const pathLine = `export PATH="$HOME/.kyberbot/bin:$PATH"`;
     for (const profilePath of profilePaths) {
       if (existsSync(profilePath)) {
@@ -243,8 +269,7 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
       }
     }
 
-    // Reset cached PATH so the check picks it up immediately
-    _shellPath = null;
+    // PATH is rebuilt fresh each call — no cache to reset
 
     return { ok: true, stdout: log, stderr: '' };
   } catch (err) {
