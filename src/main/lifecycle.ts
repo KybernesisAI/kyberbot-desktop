@@ -153,6 +153,9 @@ export class LifecycleManager extends EventEmitter {
     const agentRoot = this.store.getAgentRoot();
     if (!agentRoot) throw new Error('Agent root not configured');
 
+    // Auto-fix broken wrapper if it uses output capture (v1.6.0 bug)
+    this.ensureWorkingWrapper();
+
     // Already running?
     const existing = this.agents.get(agentRoot);
     if (existing && (existing.status === 'running' || existing.status === 'starting')) {
@@ -603,6 +606,54 @@ export class LifecycleManager extends EventEmitter {
    * Bypasses the bash wrapper entirely — no output capturing, no shell layer.
    * This ensures stdout/stderr stream directly to the desktop app.
    */
+  /**
+   * Check if the CLI wrapper has the broken output-capture pattern and fix it.
+   * The v1.6.0 wrapper used OUTPUT=$(...) which hangs on long-running commands.
+   */
+  private ensureWorkingWrapper(): void {
+    try {
+      const home = require('os').homedir();
+      const wrapperPath = join(home, '.kyberbot', 'bin', 'kyberbot');
+      if (!existsSync(wrapperPath)) return;
+
+      const content = readFileSync(wrapperPath, 'utf-8');
+      // Detect the broken pattern: OUTPUT=$("$NODE" "$CLI_ENTRY" "$@" 2>&1)
+      if (content.includes('OUTPUT=$("$NODE"') || content.includes('OUTPUT=$(')) {
+        console.log('[lifecycle] Fixing broken CLI wrapper (output capture → exec)');
+
+        const direct = this.resolveCliDirect();
+        if (!direct) return;
+
+        const sourceDir = join(home, '.kyberbot', 'source');
+        const wrapper = `#!/bin/bash
+# KyberBot CLI — auto-fixed by KyberBot Desktop
+LOCK_FILE="$HOME/.kyberbot/node_path"
+CLI_ENTRY="${direct.entry}"
+SOURCE_DIR="${sourceDir}"
+if [ -f "$LOCK_FILE" ]; then NODE=$(cat "$LOCK_FILE"); fi
+if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
+  [ -d "$HOME/.nvm/versions/node" ] && NODE=$(ls -d "$HOME/.nvm/versions/node"/v*/bin/node 2>/dev/null | sort -V | tail -1)
+  [ -z "$NODE" ] && [ -x /usr/local/bin/node ] && NODE=/usr/local/bin/node
+  [ -z "$NODE" ] && [ -x /opt/homebrew/bin/node ] && NODE=/opt/homebrew/bin/node
+  [ -z "$NODE" ] && NODE=$(which node 2>/dev/null)
+  [ -z "$NODE" ] && echo "Error: Node.js not found" && exit 1
+fi
+CHECK=$("$NODE" "$CLI_ENTRY" --version 2>&1)
+if echo "$CHECK" | grep -q "NODE_MODULE_VERSION"; then
+  echo "Rebuilding better-sqlite3..."
+  cd "$SOURCE_DIR" && pnpm rebuild better-sqlite3 2>/dev/null
+  echo "$NODE" > "$LOCK_FILE"
+fi
+exec "$NODE" "$CLI_ENTRY" "$@"
+`;
+        const { writeFileSync: writeWrapper, chmodSync } = require('fs');
+        writeWrapper(wrapperPath, wrapper, 'utf-8');
+        chmodSync(wrapperPath, '755');
+        console.log('[lifecycle] CLI wrapper fixed');
+      }
+    } catch { /* non-fatal */ }
+  }
+
   private resolveCliDirect(): { node: string; entry: string } | null {
     const home = require('os').homedir();
 
