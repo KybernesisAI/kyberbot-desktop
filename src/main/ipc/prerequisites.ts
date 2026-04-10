@@ -127,9 +127,9 @@ export function registerPrerequisiteHandlers(store: AppStore): void {
       return installKyberbotCli();
     }
 
-    const userShell = process.env.SHELL || '/bin/zsh';
     return new Promise((resolve) => {
-      const proc = spawn(userShell, ['-ilc', `npm install -g ${pkg}`], {
+      const proc = spawn('sh', ['-c', `npm install -g ${pkg}`], {
+        env: { ...process.env, PATH: getFullPath() },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 
@@ -165,8 +165,9 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
   const repoUrl = 'https://github.com/KybernesisAI/kyberbot.git';
   const run = (cmd: string, cwd?: string): Promise<{ ok: boolean; output: string }> => {
     return new Promise((resolve) => {
-      const userShell = process.env.SHELL || '/bin/zsh';
-      const proc = spawn(userShell, ['-ilc', cwd ? `cd "${cwd}" && ${cmd}` : cmd], {
+      const proc = spawn('sh', ['-c', cmd], {
+        cwd: cwd || undefined,
+        env: { ...process.env, PATH: getFullPath(), HOME: home },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
       let output = '';
@@ -174,6 +175,8 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
       proc.stderr?.on('data', (d: Buffer) => { output += d.toString(); });
       proc.on('close', (code) => resolve({ ok: code === 0, output }));
       proc.on('error', (err) => resolve({ ok: false, output: err.message }));
+      // Timeout per command — 3 minutes max
+      setTimeout(() => { try { proc.kill(); } catch {} resolve({ ok: false, output: output + '\nCommand timed out' }); }, 180_000);
     });
   };
 
@@ -307,10 +310,9 @@ function checkDocker(): PrerequisiteStatus['docker'] {
   const version = tryBinary('docker', '--version', knownPaths);
   if (!version) return { installed: false, running: false, version: null };
 
-  // Check if running
+  // Check if running — use 'docker ps' (fast) instead of 'docker info' (slow on fresh installs)
   try {
-    const opts = { encoding: 'utf-8' as const, timeout: 10000, stdio: 'pipe' as const };
-    execSync('docker info', { ...opts, env: { ...process.env, PATH: getFullPath() } });
+    execSync('docker ps -q', { encoding: 'utf-8', timeout: 15000, stdio: 'pipe', env: { ...process.env, PATH: getFullPath() } });
     return { installed: true, running: true, version };
   } catch {
     return { installed: true, running: false, version };
