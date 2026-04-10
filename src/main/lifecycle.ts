@@ -329,7 +329,6 @@ export class LifecycleManager extends EventEmitter {
     agent.restartCount = 0;
     this.emitAgentStatus(root);
 
-    const cliPath = this.resolveCliPath();
     const fullPath = this.getFullPath();
 
     // Logs
@@ -355,7 +354,13 @@ export class LifecycleManager extends EventEmitter {
       }
     } catch {}
 
-    agent.process = spawn(cliPath, ['run'], {
+    // Prefer direct spawn (node + entry point) over the bash wrapper.
+    // The wrapper can capture output or add shell layers that prevent streaming.
+    const direct = this.resolveCliDirect();
+    const spawnCmd = direct ? direct.node : this.resolveCliPath();
+    const spawnArgs = direct ? [direct.entry, 'run'] : ['run'];
+
+    agent.process = spawn(spawnCmd, spawnArgs, {
       cwd: root,
       env: {
         ...process.env,
@@ -469,7 +474,6 @@ export class LifecycleManager extends EventEmitter {
   private spawnFleetProcess(agents: string[]): void {
     this.emit('status-change', 'starting', '__fleet__');
 
-    const cliPath = this.resolveCliPath();
     const fullPath = this.getFullPath();
     const agentRoot = this.store.getAgentRoot();
 
@@ -479,7 +483,11 @@ export class LifecycleManager extends EventEmitter {
       this.fleetLogStream = createWriteStream(join(logDir, 'desktop-fleet.log'), { flags: 'a' });
     }
 
-    this.fleetProcess = spawn(cliPath, ['fleet', 'start', '--only', agents.join(',')], {
+    const direct = this.resolveCliDirect();
+    const spawnCmd = direct ? direct.node : this.resolveCliPath();
+    const spawnArgs = direct ? [direct.entry, 'fleet', 'start', '--only', agents.join(',')] : ['fleet', 'start', '--only', agents.join(',')];
+
+    this.fleetProcess = spawn(spawnCmd, spawnArgs, {
       cwd: agentRoot || undefined,
       env: {
         ...process.env,
@@ -590,11 +598,73 @@ export class LifecycleManager extends EventEmitter {
     return this.getPortForRoot(root);
   }
 
+  /**
+   * Resolve the CLI entry point. Returns { node, entry } for direct spawn.
+   * Bypasses the bash wrapper entirely — no output capturing, no shell layer.
+   * This ensures stdout/stderr stream directly to the desktop app.
+   */
+  private resolveCliDirect(): { node: string; entry: string } | null {
+    const home = require('os').homedir();
+
+    // Find the CLI entry point
+    const entryPaths = [
+      join(home, '.kyberbot', 'source', 'packages', 'cli', 'dist', 'index.js'),
+    ];
+
+    // Also check if kyberbot was installed via npm link (monorepo)
+    try {
+      const nvmDir = join(home, '.nvm', 'versions', 'node');
+      if (existsSync(nvmDir)) {
+        const { readdirSync, realpathSync } = require('fs');
+        for (const v of readdirSync(nvmDir).sort().reverse()) {
+          const linked = join(nvmDir, v, 'lib', 'node_modules', '@kyberbot', 'cli', 'dist', 'index.js');
+          if (existsSync(linked)) {
+            try { entryPaths.push(realpathSync(linked)); } catch { entryPaths.push(linked); }
+          }
+        }
+      }
+    } catch {}
+
+    // Find the entry
+    let entry: string | null = null;
+    for (const p of entryPaths) {
+      if (existsSync(p)) { entry = p; break; }
+    }
+    if (!entry) return null;
+
+    // Find node — prefer locked binary, then discover
+    let node: string | null = null;
+    const lockFile = join(home, '.kyberbot', 'node_path');
+    try {
+      const locked = readFileSync(lockFile, 'utf-8').trim();
+      if (existsSync(locked)) node = locked;
+    } catch {}
+
+    if (!node) {
+      // Discover node
+      try {
+        const nvmDir = join(home, '.nvm', 'versions', 'node');
+        if (existsSync(nvmDir)) {
+          const { readdirSync } = require('fs');
+          const versions = readdirSync(nvmDir).sort().reverse();
+          for (const v of versions) {
+            const p = join(nvmDir, v, 'bin', 'node');
+            if (existsSync(p)) { node = p; break; }
+          }
+        }
+      } catch {}
+      if (!node && existsSync('/usr/local/bin/node')) node = '/usr/local/bin/node';
+      if (!node && existsSync('/opt/homebrew/bin/node')) node = '/opt/homebrew/bin/node';
+    }
+
+    if (!node) return null;
+    return { node, entry };
+  }
+
   private resolveCliPath(): string {
     const home = require('os').homedir();
-    const fullPath = this.getFullPath();
 
-    // Check known locations directly — no execSync
+    // Check known wrapper/binary locations as fallback
     const candidates = [
       join(home, '.kyberbot', 'bin', 'kyberbot'),
       '/usr/local/bin/kyberbot',
@@ -604,7 +674,6 @@ export class LifecycleManager extends EventEmitter {
       join(home, '.npm-global', 'bin', 'kyberbot'),
     ];
 
-    // Check nvm versions
     try {
       const nvmDir = join(home, '.nvm', 'versions', 'node');
       if (existsSync(nvmDir)) {
@@ -619,7 +688,7 @@ export class LifecycleManager extends EventEmitter {
       if (existsSync(p)) return p;
     }
 
-    return 'kyberbot'; // last resort — hope it's in PATH
+    return 'kyberbot';
   }
 
   private getFullPath(): string {
