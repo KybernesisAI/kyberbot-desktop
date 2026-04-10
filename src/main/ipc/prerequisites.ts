@@ -62,6 +62,9 @@ const execOpts = () => ({ encoding: 'utf-8' as const, timeout: 10000, env: { ...
 
 export function registerPrerequisiteHandlers(store: AppStore): void {
   ipcMain.handle(IPC.PREREQ_CHECK, async (): Promise<PrerequisiteStatus> => {
+    // Reset PATH cache each check — user may have installed something since last check
+    _shellPath = null;
+
     const node = checkNode();
     const docker = checkDocker();
     const claude = checkClaude();
@@ -243,45 +246,117 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
   }
 }
 
-function checkNode(): { installed: boolean; version: string | null } {
+/**
+ * Try running a command at specific known paths, then fall back to PATH.
+ * Returns the version string on success, null on failure.
+ */
+function tryBinary(name: string, versionFlag: string, knownPaths: string[]): string | null {
+  const opts = { encoding: 'utf-8' as const, timeout: 10000, stdio: 'pipe' as const };
+
+  // Try each known path directly (no PATH dependency)
+  for (const binPath of knownPaths) {
+    try {
+      if (existsSync(binPath)) {
+        return execSync(`"${binPath}" ${versionFlag}`, opts).trim();
+      }
+    } catch { /* try next */ }
+  }
+
+  // Fall back to login shell (picks up whatever PATH the user has)
   try {
-    const version = execSync('node --version', execOpts()).trim();
-    return { installed: true, version };
+    const userShell = process.env.SHELL || '/bin/zsh';
+    return execSync(`${userShell} -ilc "${name} ${versionFlag}"`, {
+      ...opts,
+      timeout: 8000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim().split('\n').pop()?.trim() || null;
+  } catch { /* not found */ }
+
+  // Fall back to constructed PATH
+  try {
+    return execSync(`${name} ${versionFlag}`, execOpts()).trim();
   } catch {
-    return { installed: false, version: null };
+    return null;
   }
 }
 
-function checkDocker(): PrerequisiteStatus['docker'] {
+function checkNode(): { installed: boolean; version: string | null } {
+  const home = process.env.HOME || '';
+  const knownPaths = [
+    '/usr/local/bin/node',
+    '/opt/homebrew/bin/node',
+  ];
+  // Add all nvm versions
   try {
-    const version = execSync('docker --version', execOpts()).trim();
-    try {
-      execSync('docker info', execOpts());
-      return { installed: true, running: true, version };
-    } catch {
-      return { installed: true, running: false, version };
+    const nvmDir = join(home, '.nvm/versions/node');
+    for (const v of readdirSync(nvmDir).sort().reverse()) {
+      knownPaths.push(join(nvmDir, v, 'bin/node'));
     }
+  } catch { /* no nvm */ }
+
+  const version = tryBinary('node', '--version', knownPaths);
+  return { installed: !!version, version };
+}
+
+function checkDocker(): PrerequisiteStatus['docker'] {
+  const knownPaths = [
+    '/usr/local/bin/docker',
+    '/opt/homebrew/bin/docker',
+    '/Applications/Docker.app/Contents/Resources/bin/docker',
+  ];
+  const version = tryBinary('docker', '--version', knownPaths);
+  if (!version) return { installed: false, running: false, version: null };
+
+  // Check if running
+  try {
+    const opts = { encoding: 'utf-8' as const, timeout: 10000, stdio: 'pipe' as const };
+    execSync('docker info', { ...opts, env: { ...process.env, PATH: getFullPath() } });
+    return { installed: true, running: true, version };
   } catch {
-    return { installed: false, running: false, version: null };
+    return { installed: true, running: false, version };
   }
 }
 
 function checkClaude(): PrerequisiteStatus['claude'] {
+  const home = process.env.HOME || '';
+  const knownPaths = [
+    '/usr/local/bin/claude',
+    '/opt/homebrew/bin/claude',
+    join(home, '.local/bin/claude'),
+    join(home, '.npm-global/bin/claude'),
+  ];
+  // Add nvm versions
   try {
-    const version = execSync('claude --version', execOpts()).trim();
-    return { installed: true, version };
-  } catch {
-    return { installed: false, version: null };
-  }
+    const nvmDir = join(home, '.nvm/versions/node');
+    for (const v of readdirSync(nvmDir).sort().reverse()) {
+      knownPaths.push(join(nvmDir, v, 'bin/claude'));
+    }
+  } catch { /* no nvm */ }
+
+  const version = tryBinary('claude', '--version', knownPaths);
+  return { installed: !!version, version };
 }
 
 function checkKyberbot(): { installed: boolean; version: string | null } {
+  const home = process.env.HOME || '';
+  const knownPaths = [
+    join(home, '.kyberbot/bin/kyberbot'),
+    '/usr/local/bin/kyberbot',
+    '/opt/homebrew/bin/kyberbot',
+    join(home, '.local/bin/kyberbot'),
+    join(home, 'Library/pnpm/kyberbot'),
+    join(home, '.npm-global/bin/kyberbot'),
+  ];
+  // Add nvm versions
   try {
-    const version = execSync('kyberbot --version', execOpts()).trim();
-    return { installed: true, version };
-  } catch {
-    return { installed: false, version: null };
-  }
+    const nvmDir = join(home, '.nvm/versions/node');
+    for (const v of readdirSync(nvmDir).sort().reverse()) {
+      knownPaths.push(join(nvmDir, v, 'bin/kyberbot'));
+    }
+  } catch { /* no nvm */ }
+
+  const version = tryBinary('kyberbot', '--version', knownPaths);
+  return { installed: !!version, version };
 }
 
 function checkAgentRoot(store: AppStore): PrerequisiteStatus['agentRoot'] {
