@@ -182,38 +182,86 @@ export function registerOnboardingHandlers(store: AppStore): void {
           }
         }
       }
+
+      // Replace placeholders in copied template files
+      const placeholderFiles = [
+        join(agentRoot, '.claude', 'CLAUDE.md'),
+        join(agentRoot, '.claude', 'commands', 'kyberbot.md'),
+      ];
+      for (const filePath of placeholderFiles) {
+        if (existsSync(filePath)) {
+          let content = readFileSync(filePath, 'utf-8');
+          content = content.replace(/\{\{AGENT_NAME\}\}/g, agentName);
+          content = content.replace(/\{\{HEARTBEAT_INTERVAL\}\}/g, '30 minutes');
+          writeFileSync(filePath, content, 'utf-8');
+        }
+      }
     } catch {
       // Template copy failed — non-fatal, agent still works without default skills
     }
 
-    // Try to scaffold CLAUDE.md via kyberbot skill rebuild
+    // Try to scaffold CLAUDE.md via kyberbot skill rebuild (adds installed skills list)
     try {
       const home = process.env.HOME || '';
-      const nvmPaths: string[] = [];
+      // Use our wrapper if it exists, otherwise try PATH
+      const kyberbot = existsSync(join(home, '.kyberbot', 'bin', 'kyberbot'))
+        ? join(home, '.kyberbot', 'bin', 'kyberbot')
+        : 'kyberbot';
+
+      // Build a comprehensive PATH
+      const pathParts = [join(home, '.kyberbot/bin'), join(home, '.local/bin'), '/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin'];
       try {
         const nvmDir = join(home, '.nvm/versions/node');
-        const versions = require('fs').readdirSync(nvmDir) as string[];
-        versions.sort((a: string, b: string) => {
-          const va = a.replace('v', '').split('.').map(Number);
-          const vb = b.replace('v', '').split('.').map(Number);
-          for (let i = 0; i < 3; i++) { if ((vb[i] || 0) !== (va[i] || 0)) return (vb[i] || 0) - (va[i] || 0); }
-          return 0;
-        });
-        for (const v of versions) nvmPaths.push(join(nvmDir, v, 'bin'));
+        for (const v of readdirSync(nvmDir).sort().reverse()) {
+          pathParts.unshift(join(nvmDir, v, 'bin'));
+        }
       } catch {}
-      const fullPath = [...nvmPaths, join(home, '.local/bin'), '/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin',
-        ...(process.env.PATH || '').split(':')].join(':');
+      const fullPath = [...pathParts, ...(process.env.PATH || '').split(':')].join(':');
 
-      execSync('kyberbot skill rebuild', {
+      execSync(`"${kyberbot}" skill rebuild`, {
         cwd: agentRoot,
         env: { ...process.env, KYBERBOT_ROOT: agentRoot, PATH: fullPath },
-        timeout: 15_000,
+        timeout: 30_000,
         stdio: 'pipe',
       });
     } catch {
-      // skill rebuild failed — write a minimal CLAUDE.md
-      writeFileSync(join(agentRoot, '.claude', 'CLAUDE.md'),
-        `# ${agentName} — Operational Manual\n\nAgent: ${agentName}\nRole: ${agentDescription}\n`, 'utf-8');
+      // skill rebuild failed — the template CLAUDE.md was already copied above
+      // If that also failed, write a functional fallback with core instructions
+      if (!existsSync(join(agentRoot, '.claude', 'CLAUDE.md'))) {
+        writeFileSync(join(agentRoot, '.claude', 'CLAUDE.md'), [
+          `# ${agentName} — Operational Manual`,
+          '',
+          `> Agent: ${agentName}`,
+          `> Role: ${agentDescription}`,
+          '',
+          '## Identity',
+          '',
+          'Read [SOUL.md](../SOUL.md) for who I am. Read [USER.md](../USER.md) for what I know about you.',
+          '',
+          '## Memory',
+          '',
+          'I have a persistent brain with entity graph, timeline, and semantic search.',
+          '- Use `kyberbot recall "<entity>"` to look up people, projects, companies',
+          '- Use `kyberbot search "<query>"` for semantic search across all memories',
+          '- Use `kyberbot remember "<text>"` to store important information',
+          '- Use `kyberbot timeline --today` for recent activity',
+          '',
+          '## Self-Evolution',
+          '',
+          '| File | What It Is |',
+          '|------|-----------|',
+          '| `SOUL.md` | Who I am — my identity, values, style |',
+          '| `USER.md` | What I know about the user |',
+          '| `HEARTBEAT.md` | My recurring tasks |',
+          '',
+          'I update these files autonomously as I learn.',
+          '',
+          '## Available Skills',
+          '',
+          'Check the `skills/` directory for installed skills. Each skill has a `SKILL.md` with instructions.',
+          '',
+        ].join('\n'), 'utf-8');
+      }
     }
 
     // Auto-register in ~/.kyberbot/registry.yaml
@@ -289,6 +337,10 @@ function findTemplateDir(): string | null {
     const npmRoot = execSync('npm root -g', { encoding: 'utf-8', timeout: 5000 }).trim();
     cliPaths.push(join(npmRoot, '@kyberbot/cli'));
   } catch {}
+
+  // Check our own install location first (desktop installer clones here)
+  const desktopInstall = join(home, '.kyberbot', 'source', 'template');
+  if (existsSync(join(desktopInstall, 'skills'))) return desktopInstall;
 
   for (const cliPath of cliPaths) {
     if (!existsSync(cliPath)) continue;
