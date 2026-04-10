@@ -65,10 +65,13 @@ export function registerPrerequisiteHandlers(store: AppStore): void {
     // Reset PATH cache each check — user may have installed something since last check
     _shellPath = null;
 
-    const node = checkNode();
-    const docker = checkDocker();
-    const claude = checkClaude();
-    const kyberbot = checkKyberbot();
+    // Run all checks in parallel — all async, never blocks main thread
+    const [node, docker, claude, kyberbot] = await Promise.all([
+      checkNode(),
+      checkDocker(),
+      checkClaude(),
+      checkKyberbot(),
+    ]);
     const agentRoot = checkAgentRoot(store);
     return { node, docker, claude, kyberbot, agentRoot };
   });
@@ -250,46 +253,48 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
 }
 
 /**
- * Try running a command at specific known paths, then fall back to PATH.
- * Returns the version string on success, null on failure.
+ * Run a command asynchronously with a timeout. Never blocks the main thread.
  */
-function tryBinary(name: string, versionFlag: string, knownPaths: string[]): string | null {
-  const opts = { encoding: 'utf-8' as const, timeout: 10000, stdio: 'pipe' as const };
-
-  // Try each known path directly (no PATH dependency)
-  for (const binPath of knownPaths) {
-    try {
-      if (existsSync(binPath)) {
-        return execSync(`"${binPath}" ${versionFlag}`, opts).trim();
-      }
-    } catch { /* try next */ }
-  }
-
-  // Fall back to login shell (picks up whatever PATH the user has)
-  try {
-    const userShell = process.env.SHELL || '/bin/zsh';
-    return execSync(`${userShell} -ilc "${name} ${versionFlag}"`, {
-      ...opts,
-      timeout: 8000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim().split('\n').pop()?.trim() || null;
-  } catch { /* not found */ }
-
-  // Fall back to constructed PATH
-  try {
-    return execSync(`${name} ${versionFlag}`, execOpts()).trim();
-  } catch {
-    return null;
-  }
+function runAsync(cmd: string, timeoutMs: number = 8000): Promise<string | null> {
+  return new Promise((resolve) => {
+    const proc = spawn('sh', ['-c', cmd], {
+      env: { ...process.env, PATH: getFullPath() },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    proc.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
+    proc.on('close', (code) => resolve(code === 0 ? stdout.trim() : null));
+    proc.on('error', () => resolve(null));
+    setTimeout(() => { try { proc.kill(); } catch {} resolve(null); }, timeoutMs);
+  });
 }
 
-function checkNode(): { installed: boolean; version: string | null } {
+/**
+ * Try running a version check at known paths, then fall back to PATH.
+ * Fully async — never blocks the main thread.
+ */
+async function tryBinary(name: string, versionFlag: string, knownPaths: string[]): Promise<string | null> {
+  // Try each known path directly (no PATH dependency, no shell)
+  for (const binPath of knownPaths) {
+    if (existsSync(binPath)) {
+      const result = await runAsync(`"${binPath}" ${versionFlag}`, 5000);
+      if (result) return result.split('\n').pop()?.trim() || result;
+    }
+  }
+
+  // Fall back to PATH-based check
+  const result = await runAsync(`${name} ${versionFlag}`, 5000);
+  if (result) return result.split('\n').pop()?.trim() || result;
+
+  return null;
+}
+
+async function checkNode(): Promise<{ installed: boolean; version: string | null }> {
   const home = process.env.HOME || '';
   const knownPaths = [
     '/usr/local/bin/node',
     '/opt/homebrew/bin/node',
   ];
-  // Add all nvm versions
   try {
     const nvmDir = join(home, '.nvm/versions/node');
     for (const v of readdirSync(nvmDir).sort().reverse()) {
@@ -297,29 +302,25 @@ function checkNode(): { installed: boolean; version: string | null } {
     }
   } catch { /* no nvm */ }
 
-  const version = tryBinary('node', '--version', knownPaths);
+  const version = await tryBinary('node', '--version', knownPaths);
   return { installed: !!version, version };
 }
 
-function checkDocker(): PrerequisiteStatus['docker'] {
+async function checkDocker(): Promise<PrerequisiteStatus['docker']> {
   const knownPaths = [
     '/usr/local/bin/docker',
     '/opt/homebrew/bin/docker',
     '/Applications/Docker.app/Contents/Resources/bin/docker',
   ];
-  const version = tryBinary('docker', '--version', knownPaths);
+  const version = await tryBinary('docker', '--version', knownPaths);
   if (!version) return { installed: false, running: false, version: null };
 
-  // Check if running — use 'docker ps' (fast) instead of 'docker info' (slow on fresh installs)
-  try {
-    execSync('docker ps -q', { encoding: 'utf-8', timeout: 15000, stdio: 'pipe', env: { ...process.env, PATH: getFullPath() } });
-    return { installed: true, running: true, version };
-  } catch {
-    return { installed: true, running: false, version };
-  }
+  // Check if running — async, won't block
+  const running = await runAsync('docker ps -q', 10000);
+  return { installed: true, running: running !== null, version };
 }
 
-function checkClaude(): PrerequisiteStatus['claude'] {
+async function checkClaude(): Promise<PrerequisiteStatus['claude']> {
   const home = process.env.HOME || '';
   const knownPaths = [
     '/usr/local/bin/claude',
@@ -327,7 +328,6 @@ function checkClaude(): PrerequisiteStatus['claude'] {
     join(home, '.local/bin/claude'),
     join(home, '.npm-global/bin/claude'),
   ];
-  // Add nvm versions
   try {
     const nvmDir = join(home, '.nvm/versions/node');
     for (const v of readdirSync(nvmDir).sort().reverse()) {
@@ -335,11 +335,11 @@ function checkClaude(): PrerequisiteStatus['claude'] {
     }
   } catch { /* no nvm */ }
 
-  const version = tryBinary('claude', '--version', knownPaths);
+  const version = await tryBinary('claude', '--version', knownPaths);
   return { installed: !!version, version };
 }
 
-function checkKyberbot(): { installed: boolean; version: string | null } {
+async function checkKyberbot(): Promise<{ installed: boolean; version: string | null }> {
   const home = process.env.HOME || '';
   const knownPaths = [
     join(home, '.kyberbot/bin/kyberbot'),
@@ -349,7 +349,6 @@ function checkKyberbot(): { installed: boolean; version: string | null } {
     join(home, 'Library/pnpm/kyberbot'),
     join(home, '.npm-global/bin/kyberbot'),
   ];
-  // Add nvm versions
   try {
     const nvmDir = join(home, '.nvm/versions/node');
     for (const v of readdirSync(nvmDir).sort().reverse()) {
@@ -357,7 +356,7 @@ function checkKyberbot(): { installed: boolean; version: string | null } {
     }
   } catch { /* no nvm */ }
 
-  const version = tryBinary('kyberbot', '--version', knownPaths);
+  const version = await tryBinary('kyberbot', '--version', knownPaths);
   return { installed: !!version, version };
 }
 
