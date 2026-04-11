@@ -428,6 +428,7 @@ export default function DashboardView() {
   const { health, cliStatus, fleetMode, fleetStatus, agents, activeAgent, setActiveAgent, agentRoot, runningAgentRoot } = useApp();
   const kb = (window as any).kyberbot;
   const [logs, setLogs] = useState<string[]>([]);
+  const [selectedFleetAgents, setSelectedFleetAgents] = useState<Set<string>>(new Set());
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   const currentAgent = agents.find(a => a.name?.toLowerCase() === activeAgent?.toLowerCase());
@@ -439,6 +440,13 @@ export default function DashboardView() {
 
   const services = health?.services ?? SERVICE_NAMES.map(name => ({ name, status: isRunning ? 'unknown' : 'stopped' }));
   const ansiConverter = useMemo(() => new AnsiToHtml({ fg: '#a1a1aa', bg: 'transparent', newline: false, escapeXML: true }), []);
+
+  // Initialize fleet agent selection — all selected by default
+  useEffect(() => {
+    if (agents.length > 0 && selectedFleetAgents.size === 0) {
+      setSelectedFleetAgents(new Set(agents.map(a => a.name)));
+    }
+  }, [agents]);
 
   // Load logs — in fleet mode all agents share one log stream ('__fleet__')
   const logKey = fleetMode ? '__fleet__' : agentRoot;
@@ -459,37 +467,6 @@ export default function DashboardView() {
 
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflowY: "auto", padding: 16, background: "var(--bg-primary)" }}>
-      {/* Fleet banner — visible when 2+ agents registered but fleet not running */}
-      {agents.length >= 2 && !fleetStatus && !isStarting && (
-        <div className="mb-4 p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-          <div className="flex items-center justify-between">
-            <span style={{
-              fontFamily: 'var(--font-mono)', fontSize: '11px',
-              color: 'var(--fg-secondary)',
-            }}>
-              {agents.length} agents registered
-            </span>
-            <button
-              onClick={async () => {
-                await kb?.fleet.start(agents.map((a: any) => a.name));
-              }}
-              disabled={isRunning || isStarting || isStopping}
-              className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                borderColor: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-cyan)',
-                color: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-cyan)',
-                background: 'transparent',
-                cursor: isRunning || isStarting || isStopping ? 'default' : 'pointer',
-                opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
-              }}
-            >
-              Start Fleet
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Fleet Overview (only in fleet mode) */}
       {fleetMode && fleetStatus && (
         <FleetOverview
@@ -604,6 +581,93 @@ export default function DashboardView() {
               <div className="text-[9px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>PID</div>
               <div className="text-[13px]" style={{ fontFamily: 'var(--font-mono)' }}>{health.pid}</div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fleet Mode — agent registry management (hidden when fleet is running) */}
+      {agents.length > 0 && !fleetMode && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <span className="section-title" style={{ color: 'var(--accent-cyan)' }}>{'// FLEET MODE'}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] tracking-[1px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>
+                {selectedFleetAgents.size}/{agents.length} selected
+              </span>
+              {agents.length >= 2 && !isStarting && (
+                <button
+                  onClick={async () => {
+                    const selected = [...selectedFleetAgents];
+                    if (selected.length > 0) {
+                      await kb?.fleet.start(selected);
+                    }
+                  }}
+                  disabled={isRunning || isStarting || isStopping || selectedFleetAgents.size === 0}
+                  className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    borderColor: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'var(--fg-muted)' : 'var(--accent-cyan)',
+                    color: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'var(--fg-muted)' : 'var(--accent-cyan)',
+                    background: 'transparent',
+                    cursor: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'default' : 'pointer',
+                    opacity: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 0.3 : 1,
+                  }}
+                >
+                  Start Fleet ({selectedFleetAgents.size})
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            {agents.map((agent: any) => {
+              const isSelected = selectedFleetAgents.has(agent.name);
+              const toggleSelect = () => {
+                setSelectedFleetAgents(prev => {
+                  const next = new Set(prev);
+                  if (next.has(agent.name)) next.delete(agent.name);
+                  else next.add(agent.name);
+                  return next;
+                });
+              };
+              return (
+                <div key={agent.name} className="flex items-center justify-between p-2 border" style={{ background: 'var(--bg-secondary)', borderColor: isSelected ? 'rgba(34,211,238,0.2)' : 'var(--border-color)' }}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={toggleSelect}
+                      style={{ accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
+                    />
+                    <span className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: isSelected ? 'var(--fg-primary)' : 'var(--fg-muted)' }}>{agent.name}</span>
+                    {agent.type === 'remote' && (
+                      <span style={{ fontSize: '7px', letterSpacing: '0.5px', textTransform: 'uppercase', color: '#22d3ee', border: '1px solid #22d3ee', padding: '0px 3px', fontFamily: 'var(--font-mono)', lineHeight: '12px' }}>REMOTE</span>
+                    )}
+                    <span className="text-[9px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>
+                      {agent.type === 'remote' ? (agent.remoteUrl || '') : (agent.root || '').replace(/^\/Users\/[^/]+\//, '~/')}
+                    </span>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (confirm(`Unregister "${agent.name}" from the fleet? This does not delete any files.`)) {
+                        if (agent.type === 'remote') {
+                          await kb?.fleet.unregisterRemote(agent.name);
+                        } else {
+                          await kb?.fleet.unregister(agent.name);
+                        }
+                        setSelectedFleetAgents(prev => { const next = new Set(prev); next.delete(agent.name); return next; });
+                      }
+                    }}
+                    className="text-[8px] tracking-[0.5px] uppercase"
+                    style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-error)', background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.6 }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                  >
+                    Unregister
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
