@@ -208,10 +208,10 @@ export class LifecycleManager extends EventEmitter {
   async stopCli(): Promise<void> {
     if (this._fleetMode) return this.stopFleet();
 
-    const agentRoot = this.store.getAgentRoot();
-    if (!agentRoot) return;
-
-    await this.stopAgent(agentRoot);
+    // Stop ALL agents, not just the currently viewed one
+    for (const root of this.agents.keys()) {
+      await this.stopAgent(root);
+    }
   }
 
   /** Stop a specific agent by root */

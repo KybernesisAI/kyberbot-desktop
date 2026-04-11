@@ -229,7 +229,7 @@ export default function MemoryCanvas({ nodes, edges, isDark = true, onNodeSelect
       // ── drawGrid (from arcana page.tsx:936-947) ──
       const drawGrid = () => {
         const gridSize = 100;
-        p.stroke(...colorsRef.current.grid);
+        p.stroke(...colorsRef.current.grid as [number, number, number, number]);
         p.strokeWeight(0.5);
         for (let x = -p.width; x < p.width * 2; x += gridSize) {
           p.line(x, -p.height, x, p.height * 2);
@@ -273,14 +273,14 @@ export default function MemoryCanvas({ nodes, edges, isDark = true, onNodeSelect
             p.stroke(r, g, b, alpha);
             p.strokeWeight(weight);
             if (strength > 0.6) {
-              p.drawingContext.setLineDash([]);
+              (p.drawingContext as CanvasRenderingContext2D).setLineDash([]);
             } else if (strength > 0.3) {
-              p.drawingContext.setLineDash([4, 6]);
+              (p.drawingContext as CanvasRenderingContext2D).setLineDash([4, 6]);
             } else {
-              p.drawingContext.setLineDash([1, 7]);
+              (p.drawingContext as CanvasRenderingContext2D).setLineDash([1, 7]);
             }
             p.line(from.pos.x, from.pos.y, to.pos.x, to.pos.y);
-            p.drawingContext.setLineDash([]);
+            (p.drawingContext as CanvasRenderingContext2D).setLineDash([]);
             return;
           }
 
@@ -416,7 +416,7 @@ export default function MemoryCanvas({ nodes, edges, isDark = true, onNodeSelect
 
       // ── p5 draw (from arcana page.tsx:1237-1267) ──
       p.draw = () => {
-        p.background(...colorsRef.current.bg);
+        p.background(...colorsRef.current.bg as [number, number, number]);
         const camera = cameraRef.current;
         camera.zoom = p.lerp(camera.zoom, camera.targetZoom, 0.1);
         p.push();

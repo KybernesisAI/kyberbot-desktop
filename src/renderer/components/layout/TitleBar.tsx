@@ -170,9 +170,9 @@ export default function TitleBar() {
         padding: '0 12px',
         background: 'var(--bg-secondary)',
         borderBottom: '1px solid var(--border-color)',
-        WebkitAppRegion: 'drag' as any,
+        WebkitAppRegion: 'drag',
         position: 'relative',
-      }}
+      } as any}
     >
       {/* Spacer for native macOS stoplight buttons */}
       <div style={{ width: '70px', flexShrink: 0 }} />
@@ -183,9 +183,9 @@ export default function TitleBar() {
           onClick={handleDropdownOpen}
           style={{
             display: 'flex', alignItems: 'center', gap: '4px',
-            WebkitAppRegion: 'no-drag' as any,
+            WebkitAppRegion: 'no-drag',
             background: 'transparent', border: 'none', cursor: 'pointer',
-          }}
+          } as any}
         >
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.15em', color: 'var(--accent-emerald)', textTransform: 'uppercase' }}>
             {`// ${agentName}`}
@@ -195,7 +195,7 @@ export default function TitleBar() {
       </div>
 
       {/* Right: Update badges + Theme toggle */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', WebkitAppRegion: 'no-drag' as any, paddingRight: '8px' }}>
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', WebkitAppRegion: 'no-drag', paddingRight: '8px' } as any}>
         {/* CLI update badge */}
         {cliUpdate && (
           <button
@@ -278,7 +278,7 @@ export default function TitleBar() {
       {showMenu && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowMenu(false)} />
-          <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 50, border: '1px solid var(--border-color)', background: 'var(--bg-elevated)', padding: '4px 0', minWidth: '240px', WebkitAppRegion: 'no-drag' as any }}>
+          <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 50, border: '1px solid var(--border-color)', background: 'var(--bg-elevated)', padding: '4px 0', minWidth: '240px', WebkitAppRegion: 'no-drag' } as any}>
 
             {/* Fleet agents */}
             {loadingFleet && (

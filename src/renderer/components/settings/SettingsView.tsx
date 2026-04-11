@@ -9,7 +9,9 @@ import type { IdentityConfig, EnvConfig } from '../../../types/ipc';
 
 export default function SettingsView() {
   const kb = (window as any).kyberbot;
-  const { activeAgent, serverUrl, apiToken } = useApp();
+  const { activeAgent, serverUrl, apiToken, agents } = useApp();
+  const currentAgent = agents.find(a => a.name?.toLowerCase() === activeAgent?.toLowerCase());
+  const isRemote = currentAgent?.type === 'remote';
   const [identity, setIdentity] = useState<IdentityConfig | null>(null);
   const [env, setEnv] = useState<EnvConfig>({});
   const [saving, setSaving] = useState(false);
@@ -76,6 +78,12 @@ export default function SettingsView() {
   if (!identity) {
     return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
       <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Loading settings...</span>
+    </div>;
+  }
+
+  if (isRemote) {
+    return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
+      <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Settings are read-only for remote agents</span>
     </div>;
   }
 
@@ -150,7 +158,7 @@ export default function SettingsView() {
                 </div>
                 <div>
                   <label style={labelStyle}>Claude Model</label>
-                  <select value={identity.claude?.model || 'opus'} onChange={(e) => setIdentity({ ...identity, claude: { ...identity.claude, model: e.target.value } })} style={{ ...inputStyle, cursor: 'pointer' }}>
+                  <select value={identity.claude?.model || 'opus'} onChange={(e) => setIdentity({ ...identity, claude: { mode: identity.claude?.mode || 'subscription', ...identity.claude, model: e.target.value } })} style={{ ...inputStyle, cursor: 'pointer' }}>
                     <option value="opus">Opus</option>
                     <option value="sonnet">Sonnet</option>
                     <option value="haiku">Haiku</option>

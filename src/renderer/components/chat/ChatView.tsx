@@ -97,7 +97,7 @@ export default function ChatView() {
     if (!serverReady) return;
     // Clear current messages when switching agents
     setMessages([]);
-    setSessionId(null);
+    setSessionId(undefined);
     const loadMostRecent = async () => {
       try {
         const res = await fetch(`${serverUrl}/api/web/sessions`, { headers: authHeaders() });

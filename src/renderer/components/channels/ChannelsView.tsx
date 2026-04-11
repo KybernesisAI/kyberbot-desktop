@@ -130,7 +130,7 @@ export default function ChannelsView() {
             <div className={`status-dot ${channels.find(c => c.name === 'whatsapp')?.connected ? 'status-dot--online' : 'status-dot--offline'}`} />
             <span className="text-[13px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>WhatsApp</span>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer" style={{ WebkitAppRegion: 'no-drag' as any }}>
+          <label className="flex items-center gap-2 cursor-pointer" style={{ WebkitAppRegion: 'no-drag' } as any}>
             <span className="text-[9px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
               {config.whatsapp?.enabled ? 'ENABLED' : 'DISABLED'}
             </span>
