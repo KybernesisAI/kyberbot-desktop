@@ -398,13 +398,13 @@ export default function ChatView() {
         {streaming ? (
           <button onClick={() => abortRef.current?.abort()} className="px-4 py-2 text-[9px] tracking-[1px] uppercase border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--status-error)', color: 'var(--status-error)', background: 'transparent', cursor: 'pointer' }}>Stop</button>
         ) : (
-          <button onClick={sendMessage} disabled={!input.trim()} className="px-4 py-2 text-[9px] tracking-[1px] uppercase border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-emerald)', color: 'var(--accent-emerald)', background: 'transparent', cursor: 'pointer', opacity: input.trim() ? 1 : 0.3 }}>Send</button>
+          <button onClick={sendMessage} disabled={!input.trim()} className="px-4 py-2 text-[9px] tracking-[1px] uppercase border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-emerald)', color: input.trim() ? '#ffffff' : 'var(--accent-emerald)', background: input.trim() ? 'var(--accent-emerald)' : 'transparent', cursor: 'pointer', opacity: input.trim() ? 1 : 0.3 }}>Send</button>
         )}
       </div>
       </div>
 
       {/* Sidebar — memory blocks, sessions, agent config */}
-      <div style={{ width: '288px', padding: '12px', background: 'var(--bg-primary)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ width: '340px', padding: '14px', background: 'var(--bg-primary)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <MemoryBlocks />
         <SessionList
           currentSessionId={sessionId}

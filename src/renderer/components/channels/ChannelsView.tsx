@@ -84,13 +84,13 @@ export default function ChannelsView() {
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflowY: "auto", padding: 16, background: "var(--bg-primary)" }}>
       <span className="section-title" style={{ color: 'var(--accent-emerald)' }}>{'// CHANNELS'}</span>
-      <p className="text-[11px] mt-1 mb-4" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+      <p className="text-[12px] mt-1 mb-4" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
         Configure messaging channels. Restart services after changes.
       </p>
 
-      {message && <div className="mb-3 p-2 text-[11px] border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-emerald)', color: 'var(--accent-emerald)' }}>{message}</div>}
+      {message && <div className="mb-3 p-2 text-[12px] border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-emerald)', color: 'var(--accent-emerald)' }}>{message}</div>}
 
-      {loading && <span className="text-[11px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Loading...</span>}
+      {loading && <span className="text-[12px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Loading...</span>}
 
       {/* Telegram */}
       <div className="border p-4 mb-3" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
@@ -98,15 +98,15 @@ export default function ChannelsView() {
           <div className="flex items-center gap-2">
             <div className={`status-dot ${telegramStatus?.connected ? 'status-dot--online' : 'status-dot--offline'}`} />
             <span className="text-[13px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>Telegram</span>
-            {telegramStatus?.connected && <span className="text-[9px] tracking-[1px] uppercase" style={{ color: 'var(--status-success)' }}>CONNECTED</span>}
-            {telegramStatus?.verified !== null && telegramStatus?.verified && <span className="text-[9px] tracking-[1px] uppercase" style={{ color: 'var(--accent-cyan)' }}>VERIFIED</span>}
+            {telegramStatus?.connected && <span className="text-[11px] tracking-[1px] uppercase" style={{ color: 'var(--status-success)' }}>CONNECTED</span>}
+            {telegramStatus?.verified !== null && telegramStatus?.verified && <span className="text-[11px] tracking-[1px] uppercase" style={{ color: 'var(--accent-cyan)' }}>VERIFIED</span>}
           </div>
           {config.telegram?.bot_token && (
-            <button onClick={removeTelegram} disabled={saving} className="text-[9px] tracking-[1px] uppercase" style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-error)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Remove</button>
+            <button onClick={removeTelegram} disabled={saving} className="text-[11px] tracking-[1px] uppercase" style={{ fontFamily: 'var(--font-mono)', background: 'var(--status-error)', color: '#ffffff', border: 'none', cursor: 'pointer', padding: '2px 8px' }}>Remove</button>
           )}
         </div>
         <div className="space-y-2">
-          <label className="text-[9px] tracking-[1px] uppercase block" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Bot Token</label>
+          <label className="text-[11px] tracking-[1px] uppercase block" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Bot Token</label>
           <input
             value={telegramToken}
             onChange={(e) => setTelegramToken(e.target.value)}
@@ -115,9 +115,9 @@ export default function ChannelsView() {
             style={{ fontFamily: 'var(--font-mono)', background: 'var(--bg-tertiary)', color: 'var(--fg-primary)', border: '1px solid var(--border-color)' }}
           />
           {config.telegram?.owner_chat_id && (
-            <div className="text-[9px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Owner ID: {config.telegram.owner_chat_id}</div>
+            <div className="text-[11px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Owner ID: {config.telegram.owner_chat_id}</div>
           )}
-          <button onClick={saveTelegram} disabled={saving || !telegramToken} className="px-3 py-1 text-[9px] tracking-[1px] uppercase border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-emerald)', color: 'var(--accent-emerald)', background: 'transparent', cursor: 'pointer', opacity: saving || !telegramToken ? 0.3 : 1 }}>
+          <button onClick={saveTelegram} disabled={saving || !telegramToken} className="px-3 py-1 text-[11px] tracking-[1px] uppercase border" style={{ fontFamily: 'var(--font-mono)', background: 'var(--accent-emerald)', color: '#ffffff', border: '1px solid var(--accent-emerald)', cursor: 'pointer', opacity: saving || !telegramToken ? 0.3 : 1 }}>
             {saving ? 'Saving...' : 'Save Token'}
           </button>
         </div>
@@ -131,7 +131,7 @@ export default function ChannelsView() {
             <span className="text-[13px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>WhatsApp</span>
           </div>
           <label className="flex items-center gap-2 cursor-pointer" style={{ WebkitAppRegion: 'no-drag' } as any}>
-            <span className="text-[9px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+            <span className="text-[11px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
               {config.whatsapp?.enabled ? 'ENABLED' : 'DISABLED'}
             </span>
             <input
@@ -144,7 +144,7 @@ export default function ChannelsView() {
           </label>
         </div>
         {config.whatsapp?.enabled && (
-          <p className="text-[9px] mt-2" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] mt-2" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
             Scan the QR code that appears in the terminal after restarting services.
           </p>
         )}

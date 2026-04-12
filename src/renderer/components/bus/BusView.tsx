@@ -129,10 +129,10 @@ export default function BusView() {
     return (
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
         <div style={{ textAlign: 'center', maxWidth: 400 }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--fg-muted)', marginBottom: 8 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--fg-muted)', marginBottom: 8 }}>
             Inter-agent communication requires fleet mode.
           </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--fg-muted)', opacity: 0.6 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--fg-muted)', opacity: 0.6 }}>
             Start the fleet from the Dashboard to enable the Agent Bus.
           </div>
         </div>
@@ -156,7 +156,7 @@ export default function BusView() {
           borderBottom: '1px solid var(--border-color)',
         }}>
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '2px',
+            fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1.5px',
             textTransform: 'uppercase', color: 'var(--accent-emerald)',
           }}>
             // AGENTS
@@ -202,7 +202,7 @@ export default function BusView() {
                 }} />
                 <span style={{ flex: 1 }}>{name}</span>
                 {msgCount > 0 && (
-                  <span style={{ fontSize: '9px', color: 'var(--fg-muted)' }}>{msgCount}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--fg-muted)' }}>{msgCount}</span>
                 )}
               </button>
             );
@@ -218,7 +218,7 @@ export default function BusView() {
               borderBottom: '1px solid var(--border-color)',
             }}>
               <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '2px',
+                fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1.5px',
                 textTransform: 'uppercase', color: 'var(--accent-cyan)',
               }}>
                 // TOPICS
@@ -229,7 +229,7 @@ export default function BusView() {
                 onClick={() => setFilterTopic(null)}
                 style={{
                   display: 'block', width: '100%', padding: '6px 12px',
-                  fontFamily: 'var(--font-mono)', fontSize: '10px',
+                  fontFamily: 'var(--font-mono)', fontSize: '11px',
                   color: !filterTopic ? 'var(--accent-cyan)' : 'var(--fg-muted)',
                   background: !filterTopic ? 'var(--bg-tertiary)' : 'transparent',
                   border: 'none', cursor: 'pointer', textAlign: 'left',
@@ -243,7 +243,7 @@ export default function BusView() {
                   onClick={() => setFilterTopic(filterTopic === t ? null : t)}
                   style={{
                     display: 'block', width: '100%', padding: '6px 12px',
-                    fontFamily: 'var(--font-mono)', fontSize: '10px',
+                    fontFamily: 'var(--font-mono)', fontSize: '11px',
                     color: filterTopic === t ? 'var(--accent-cyan)' : 'var(--fg-muted)',
                     background: filterTopic === t ? 'var(--bg-tertiary)' : 'transparent',
                     border: 'none', cursor: 'pointer', textAlign: 'left',
@@ -266,7 +266,7 @@ export default function BusView() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '2px',
+            fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1.5px',
             textTransform: 'uppercase', color: 'var(--accent-emerald)',
           }}>
             // AGENT BUS
@@ -274,7 +274,7 @@ export default function BusView() {
             {filterTopic && <span style={{ color: 'var(--accent-cyan)' }}>{' / '}{filterTopic}</span>}
           </span>
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-muted)',
+            fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--fg-muted)',
           }}>
             {filtered.length} message{filtered.length !== 1 ? 's' : ''}
           </span>
@@ -285,7 +285,7 @@ export default function BusView() {
           {grouped.length === 0 ? (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              height: '100%', fontFamily: 'var(--font-mono)', fontSize: '11px',
+              height: '100%', fontFamily: 'var(--font-mono)', fontSize: '12px',
               color: 'var(--fg-muted)',
             }}>
               {messages.length === 0 ? 'No messages yet — send one below' : 'No messages match filters'}
@@ -311,7 +311,7 @@ export default function BusView() {
                         {msg.topic && (
                           <span style={{
                             marginLeft: 8, padding: '1px 6px',
-                            fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '1px',
+                            fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '1px',
                             textTransform: 'uppercase',
                             color: 'var(--accent-cyan)', background: 'rgba(34, 211, 238, 0.1)',
                           }}>
@@ -319,7 +319,7 @@ export default function BusView() {
                           </span>
                         )}
                       </div>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-muted)' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--fg-muted)' }}>
                         {formatTime(msg.timestamp)}
                       </span>
                     </div>
@@ -343,7 +343,7 @@ export default function BusView() {
                           <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{response.from}</span>
                           <span style={{ color: 'var(--fg-muted)' }}>{' replied'}</span>
                         </div>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-muted)' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--fg-muted)' }}>
                           {formatTime(response.timestamp)}
                         </span>
                       </div>
@@ -411,10 +411,10 @@ export default function BusView() {
             onClick={handleSend}
             disabled={sending || !messageText.trim()}
             style={{
-              fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px',
+              fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px',
               textTransform: 'uppercase',
-              color: sending || !messageText.trim() ? 'var(--fg-muted)' : 'var(--accent-emerald)',
-              background: 'transparent',
+              color: '#ffffff',
+              background: sending || !messageText.trim() ? 'var(--fg-muted)' : 'var(--accent-emerald)',
               border: `1px solid ${sending || !messageText.trim() ? 'var(--fg-muted)' : 'var(--accent-emerald)'}`,
               padding: '6px 14px', cursor: sending || !messageText.trim() ? 'default' : 'pointer',
               opacity: sending || !messageText.trim() ? 0.3 : 1, flexShrink: 0,

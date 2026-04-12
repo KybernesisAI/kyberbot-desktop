@@ -90,7 +90,7 @@ export default function HeartbeatView() {
   };
 
   const inputStyle = { fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--bg-tertiary)', color: 'var(--fg-primary)', border: '1px solid var(--border-color)', outline: 'none', width: '100%', padding: '6px 8px' };
-  const labelStyle = { color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase' as const, display: 'block', marginBottom: '2px' };
+  const labelStyle = { color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' as const, display: 'block', marginBottom: '2px' };
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
@@ -98,7 +98,7 @@ export default function HeartbeatView() {
       <div className="flex items-center px-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
         <div className="flex items-center gap-0 flex-1">
           {(['tasks', 'editor', 'log'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} className="px-3 py-2 relative" style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '2px', textTransform: 'uppercase', color: tab === t ? 'var(--accent-emerald)' : 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            <button key={t} onClick={() => setTab(t)} className="px-3 py-2 relative" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1.5px', textTransform: 'uppercase', color: tab === t ? 'var(--accent-emerald)' : 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
               {t}
               {tab === t && <div className="absolute bottom-0 left-0 right-0 h-[1px]" style={{ background: 'var(--accent-emerald)' }} />}
             </button>
@@ -107,22 +107,22 @@ export default function HeartbeatView() {
         <button
           onClick={triggerHeartbeat}
           disabled={triggering}
-          className="px-3 py-1 text-[9px] tracking-[1px] uppercase border mr-2"
-          style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-amber)', color: 'var(--accent-amber)', background: 'transparent', cursor: triggering ? 'default' : 'pointer', opacity: triggering ? 0.5 : 1 }}
+          className="px-3 py-1 text-[11px] tracking-[1px] uppercase border mr-2"
+          style={{ fontFamily: 'var(--font-mono)', background: 'var(--accent-amber)', color: '#ffffff', border: '1px solid var(--accent-amber)', cursor: triggering ? 'default' : 'pointer', opacity: triggering ? 0.5 : 1 }}
         >
           {triggering ? 'Running...' : 'Trigger Now'}
         </button>
       </div>
 
-      {message && <div className="mx-4 mt-2 p-2 text-[11px] border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-emerald)', color: 'var(--accent-emerald)' }}>{message}</div>}
+      {message && <div className="mx-4 mt-2 p-2 text-[12px] border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-emerald)', color: 'var(--accent-emerald)' }}>{message}</div>}
 
       {/* Content */}
       <div style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto' }}>
         {tab === 'tasks' && (
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] tracking-[1px] uppercase" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{tasks.length} tasks</span>
-              <button onClick={() => setShowAddForm(!showAddForm)} className="text-[9px] tracking-[1px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <span className="text-[11px] tracking-[1px] uppercase" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{tasks.length} tasks</span>
+              <button onClick={() => setShowAddForm(!showAddForm)} className="text-[11px] tracking-[1px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
                 {showAddForm ? 'Cancel' : '+ Add Task'}
               </button>
             </div>
@@ -134,22 +134,22 @@ export default function HeartbeatView() {
                 <div><label style={labelStyle}>Action</label><textarea value={newTask.action} onChange={e => setNewTask({ ...newTask, action: e.target.value })} style={{ ...inputStyle, height: '60px', resize: 'none' }} placeholder="What should the agent do?" /></div>
                 <div><label style={labelStyle}>Skill (optional)</label><input value={newTask.skill} onChange={e => setNewTask({ ...newTask, skill: e.target.value })} style={inputStyle} placeholder="skill-name" /></div>
                 <div><label style={labelStyle}>Time Window (optional)</label><input value={newTask.window} onChange={e => setNewTask({ ...newTask, window: e.target.value })} style={inputStyle} placeholder="e.g. 09:00-17:00" /></div>
-                <button onClick={addTask} disabled={!newTask.name || !newTask.action} className="px-3 py-1 text-[9px] tracking-[1px] uppercase border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-emerald)', color: 'var(--accent-emerald)', background: 'transparent', cursor: 'pointer', opacity: !newTask.name || !newTask.action ? 0.3 : 1 }}>Add Task</button>
+                <button onClick={addTask} disabled={!newTask.name || !newTask.action} className="px-3 py-1 text-[11px] tracking-[1px] uppercase border" style={{ fontFamily: 'var(--font-mono)', background: 'var(--accent-emerald)', color: '#ffffff', border: '1px solid var(--accent-emerald)', cursor: 'pointer', opacity: !newTask.name || !newTask.action ? 0.3 : 1 }}>Add Task</button>
               </div>
             )}
 
-            {loading && <span className="text-[11px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Loading...</span>}
-            {tasks.length === 0 && !loading && <div className="text-center py-8"><span className="text-[11px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>No heartbeat tasks defined</span></div>}
+            {loading && <span className="text-[12px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Loading...</span>}
+            {tasks.length === 0 && !loading && <div className="text-center py-8"><span className="text-[12px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>No heartbeat tasks defined</span></div>}
 
             <div className="grid gap-2">
               {tasks.map(task => (
                 <div key={task.name} className="p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[13px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{task.name}</span>
-                    <span className="text-[9px] px-1" style={{ color: 'var(--accent-cyan)', background: 'rgba(34,211,238,0.1)' }}>{task.schedule}</span>
+                    <span className="text-[11px] px-1" style={{ color: 'var(--accent-cyan)', background: 'rgba(34,211,238,0.1)' }}>{task.schedule}</span>
                   </div>
-                  <div className="text-[11px] mb-1" style={{ color: 'var(--fg-secondary)' }}>{task.action}</div>
-                  <div className="flex gap-4 text-[9px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                  <div className="text-[12px] mb-1" style={{ color: 'var(--fg-secondary)' }}>{task.action}</div>
+                  <div className="flex gap-4 text-[11px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                     {task.skill && <span>Skill: {task.skill}</span>}
                     {task.window && <span>Window: {task.window}</span>}
                     <span>Last: {formatTime(task.lastRun)}</span>
@@ -169,12 +169,12 @@ export default function HeartbeatView() {
               style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--bg-secondary)', color: 'var(--fg-primary)', border: 'none' }}
             />
             <div className="flex items-center justify-between p-2 border-t" style={{ borderColor: 'var(--border-color)' }}>
-              <span className="text-[9px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{editContent.length} chars</span>
+              <span className="text-[11px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{editContent.length} chars</span>
               <button
                 onClick={() => saveContent(editContent)}
                 disabled={saving || editContent === rawContent}
-                className="px-3 py-1 text-[9px] tracking-[1px] uppercase border"
-                style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-emerald)', color: 'var(--accent-emerald)', background: 'transparent', cursor: 'pointer', opacity: saving || editContent === rawContent ? 0.3 : 1 }}
+                className="px-3 py-1 text-[11px] tracking-[1px] uppercase border"
+                style={{ fontFamily: 'var(--font-mono)', background: 'var(--accent-emerald)', color: '#ffffff', border: '1px solid var(--accent-emerald)', cursor: 'pointer', opacity: saving || editContent === rawContent ? 0.3 : 1 }}
               >
                 {saving ? 'Saving...' : 'Save'}
               </button>
@@ -185,9 +185,9 @@ export default function HeartbeatView() {
         {tab === 'log' && (
           <div className="p-4">
             <div className="flex justify-end mb-2">
-              <button onClick={loadLog} className="text-[9px] tracking-[1px] uppercase" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Refresh</button>
+              <button onClick={loadLog} className="text-[11px] tracking-[1px] uppercase" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Refresh</button>
             </div>
-            <pre className="text-[11px] whitespace-pre-wrap" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>
+            <pre className="text-[12px] whitespace-pre-wrap" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>
               {logContent || 'No heartbeat log entries yet.'}
             </pre>
           </div>

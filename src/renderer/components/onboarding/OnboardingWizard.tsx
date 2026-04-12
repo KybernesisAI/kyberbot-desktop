@@ -95,10 +95,10 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
 
   const prereqsPassed = useCallback(() => { setStep(1); }, []);
 
-  const S: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--bg-tertiary)', color: 'var(--fg-primary)', border: '1px solid var(--border-color)', outline: 'none', width: '100%', padding: '8px 12px' };
-  const L: React.CSSProperties = { color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', display: 'block', marginBottom: '4px' };
-  const hint: React.CSSProperties = { fontSize: '10px', color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300, marginTop: '4px' };
-  const link: React.CSSProperties = { color: 'var(--accent-cyan)', cursor: 'pointer', background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: '10px', textDecoration: 'underline', padding: 0 };
+  const S: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: '12px', background: 'var(--bg-tertiary)', color: 'var(--fg-primary)', border: '1px solid var(--border-color)', outline: 'none', width: '100%', padding: '8px 12px' };
+  const L: React.CSSProperties = { color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', display: 'block', marginBottom: '4px' };
+  const hint: React.CSSProperties = { fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300, marginTop: '4px' };
+  const link: React.CSSProperties = { color: 'var(--accent-cyan)', cursor: 'pointer', background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: '11px', textDecoration: 'underline', padding: 0 };
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
@@ -125,7 +125,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                 <label style={L}>Agent Directory</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <input value={data.agentRoot} readOnly style={S} placeholder="Select a directory..." />
-                  <button onClick={selectDirectory} style={{ padding: '8px 12px', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--accent-cyan)', color: 'var(--accent-cyan)', background: 'transparent', cursor: 'pointer', whiteSpace: 'nowrap' }}>Browse</button>
+                  <button onClick={selectDirectory} style={{ padding: '8px 12px', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', background: 'var(--accent-cyan)', color: '#ffffff', border: '1px solid var(--accent-cyan)', cursor: 'pointer', whiteSpace: 'nowrap' }}>Browse</button>
                 </div>
                 <p style={hint}>Create a new folder with your agent's name (e.g., "nova", "atlas") and select it. Each agent lives in its own directory.</p>
               </div>
@@ -152,7 +152,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                 <label style={L}>Timezone</label>
                 <div style={{ ...S, background: 'var(--bg-secondary)', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span>{data.timezone}</span>
-                  <span style={{ fontSize: '8px', color: 'var(--fg-muted)' }}>AUTO-DETECTED</span>
+                  <span style={{ fontSize: '10px', color: 'var(--fg-muted)' }}>AUTO-DETECTED</span>
                 </div>
                 <p style={hint}>Detected from your system. The agent uses this for scheduling heartbeat tasks and time-aware responses.</p>
               </div>
@@ -177,7 +177,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                     <input type="radio" checked={data.claudeMode === mode} onChange={() => update({ claudeMode: mode })} style={{ accentColor: 'var(--accent-emerald)' }} />
                     <div>
                       <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{mode === 'subscription' ? 'Claude Code Subscription' : 'Anthropic API Key'}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--fg-muted)' }}>{mode === 'subscription' ? 'Uses your Claude Max/Pro subscription — recommended' : 'Pay-per-use with your own API key'}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--fg-muted)' }}>{mode === 'subscription' ? 'Uses your Claude Max/Pro subscription — recommended' : 'Pay-per-use with your own API key'}</div>
                     </div>
                   </label>
                 ))}
@@ -203,7 +203,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                   Your agent&apos;s brain uses <strong style={{ color: 'var(--fg-primary)' }}>OpenAI embeddings</strong> to understand and search memories semantically.
                   Without this key, your agent won&apos;t be able to remember conversations, recognize people, or search its knowledge base.
                 </p>
-                <p style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300, marginTop: '8px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300, marginTop: '8px' }}>
                   Cost: ~$0.02 per million tokens (most agents use less than $0.10/month)
                 </p>
               </div>
@@ -214,10 +214,10 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <p style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>
+                <p style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>
                   <strong style={{ color: 'var(--fg-secondary)' }}>How to get your key:</strong>
                 </p>
-                <div style={{ paddingLeft: '8px', fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.8' }}>
+                <div style={{ paddingLeft: '8px', fontSize: '12px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.8' }}>
                   1. Go to <button onClick={() => kb?.prerequisites.openUrl('https://platform.openai.com/api-keys')} style={link}>platform.openai.com/api-keys</button><br />
                   2. Click &quot;Create new secret key&quot;<br />
                   3. Copy and paste it above
@@ -225,7 +225,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
               </div>
 
               {!data.openaiKey && (
-                <p style={{ fontSize: '10px', color: 'var(--status-error)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>This key is required to continue</p>
+                <p style={{ fontSize: '11px', color: 'var(--status-error)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>This key is required to continue</p>
               )}
             </div>
           )}
@@ -239,7 +239,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
               {['Entity graph (SQLite) — tracks people, companies, projects', 'Timeline index — temporal event tracking', 'ChromaDB vector store (Docker) — semantic memory search', 'Brain notes directory — long-form knowledge storage', 'Heartbeat scheduler — recurring task automation', 'Sleep agent — background memory maintenance'].map(item => (
                 <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', paddingLeft: '8px' }}>
                   <span style={{ color: 'var(--accent-emerald)', flexShrink: 0 }}>{'\u2713'}</span>
-                  <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>{item}</span>
+                  <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>{item}</span>
                 </div>
               ))}
             </div>
@@ -249,7 +249,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
           {step === 6 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ padding: '12px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.6' }}>
+                <div style={{ fontSize: '12px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.6' }}>
                   <strong style={{ color: 'var(--fg-primary)' }}>Kybernesis Local</strong> is already included — your agent's memory runs entirely on your machine.
                   <br /><br />
                   <strong style={{ color: 'var(--fg-primary)' }}>Kybernesis Cloud</strong> (optional) enables cross-device sync so your agent's memory is accessible from anywhere.
@@ -270,7 +270,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
           {step === 7 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ padding: '12px', border: '1px solid rgba(16,185,129,0.2)', background: 'rgba(16,185,129,0.03)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.6' }}>
+                <div style={{ fontSize: '12px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.6' }}>
                   <strong style={{ color: 'var(--accent-emerald)' }}>Highly recommended.</strong> ngrok creates a secure tunnel so your agent can receive messages from Telegram, WhatsApp, and external services even when you're behind a firewall.
                   <br /><br />
                   ngrok is free for personal use. Without it, messaging channels won't work outside your local network.
@@ -290,7 +290,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
           {/* Step 8: Channels */}
           {step === 8 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <p style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Optional: connect messaging channels so your agent can communicate outside the desktop app.</p>
+              <p style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Optional: connect messaging channels so your agent can communicate outside the desktop app.</p>
               <div>
                 <label style={L}>Telegram Bot Token (optional)</label>
                 <input value={data.telegramToken} onChange={e => update({ telegramToken: e.target.value })} style={S} placeholder="Paste token from @BotFather on Telegram" />
@@ -300,7 +300,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                 <input type="checkbox" checked={data.whatsappEnabled} onChange={e => update({ whatsappEnabled: e.target.checked })} style={{ accentColor: 'var(--accent-emerald)' }} />
                 <div>
                   <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>Enable WhatsApp</div>
-                  <div style={{ fontSize: '10px', color: 'var(--fg-muted)' }}>You'll scan a QR code after setup to connect your WhatsApp account</div>
+                  <div style={{ fontSize: '11px', color: 'var(--fg-muted)' }}>You'll scan a QR code after setup to connect your WhatsApp account</div>
                 </div>
               </label>
             </div>
@@ -310,11 +310,11 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
           {step === 9 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ padding: '12px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.6' }}>
+                <div style={{ fontSize: '12px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.6' }}>
                   Back up your agent's state to a private GitHub repository. This includes identity files, skills, brain notes, and database snapshots.
                 </div>
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.8' }}>
+              <div style={{ fontSize: '12px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300, lineHeight: '1.8' }}>
                 <strong style={{ color: 'var(--fg-primary)' }}>How to set up:</strong>
                 <br />1. Go to <button onClick={() => kb?.prerequisites.openUrl('https://github.com/new')} style={link}>github.com/new</button>
                 <br />2. Create a <strong>private</strong> repository (e.g., "my-agent-backup")
@@ -354,11 +354,11 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
                 ['Backup', data.backupUrl || 'Skipped'],
               ].map((row, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{row[0]}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)' }}>{row[1] || '—'}</span>
+                  <span style={{ fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{row[0]}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)' }}>{row[1] || '—'}</span>
                 </div>
               ))}
-              {error && <div style={{ padding: '8px', border: '1px solid var(--status-error)', color: 'var(--status-error)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{error}</div>}
+              {error && <div style={{ padding: '8px', border: '1px solid var(--status-error)', color: 'var(--status-error)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>{error}</div>}
             </div>
           )}
         </div>
@@ -367,11 +367,11 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
       {/* Navigation */}
       {step > 0 && (
         <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)' }}>
-          <button onClick={prev} disabled={step <= 1} style={{ padding: '8px 16px', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--border-color)', color: 'var(--fg-secondary)', background: 'transparent', cursor: step <= 1 ? 'default' : 'pointer', opacity: step <= 1 ? 0.3 : 1 }}>Back</button>
+          <button onClick={prev} disabled={step <= 1} style={{ padding: '8px 16px', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--border-color)', color: 'var(--fg-secondary)', background: 'transparent', cursor: step <= 1 ? 'default' : 'pointer', opacity: step <= 1 ? 0.3 : 1 }}>Back</button>
           {step < 10 ? (
-            <button onClick={next} disabled={(step === 1 && (!data.agentRoot || !data.agentName)) || (step === 4 && !data.openaiKey)} style={{ padding: '8px 16px', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--accent-emerald)', color: 'var(--accent-emerald)', background: 'transparent', cursor: 'pointer', opacity: (step === 1 && (!data.agentRoot || !data.agentName)) || (step === 4 && !data.openaiKey) ? 0.3 : 1 }}>Next</button>
+            <button onClick={next} disabled={(step === 1 && (!data.agentRoot || !data.agentName)) || (step === 4 && !data.openaiKey)} style={{ padding: '8px 16px', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', background: 'var(--accent-emerald)', color: '#ffffff', border: '1px solid var(--accent-emerald)', cursor: 'pointer', opacity: (step === 1 && (!data.agentRoot || !data.agentName)) || (step === 4 && !data.openaiKey) ? 0.3 : 1 }}>Next</button>
           ) : (
-            <button onClick={handleCreate} disabled={creating} style={{ padding: '8px 24px', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--accent-emerald)', color: 'var(--accent-emerald)', background: 'rgba(16,185,129,0.1)', cursor: creating ? 'default' : 'pointer' }}>
+            <button onClick={handleCreate} disabled={creating} style={{ padding: '8px 24px', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', background: 'var(--accent-emerald)', color: '#ffffff', border: '1px solid var(--accent-emerald)', cursor: creating ? 'default' : 'pointer' }}>
               {creating ? 'Creating...' : 'Launch Agent'}
             </button>
           )}

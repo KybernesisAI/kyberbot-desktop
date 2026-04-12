@@ -77,25 +77,25 @@ export default function SettingsView() {
 
   if (!identity) {
     return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
-      <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Loading settings...</span>
+      <span style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Loading settings...</span>
     </div>;
   }
 
   if (isRemote) {
     return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
-      <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Settings are read-only for remote agents</span>
+      <span style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Settings are read-only for remote agents</span>
     </div>;
   }
 
   const inputStyle: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--bg-tertiary)', color: 'var(--fg-primary)', border: '1px solid var(--border-color)', outline: 'none', width: '100%', padding: '6px 8px' };
-  const labelStyle: React.CSSProperties = { color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' };
-  const btnStyle = (color: string): React.CSSProperties => ({ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', borderColor: color, color, background: 'transparent', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.5 : 1, border: '1px solid', padding: '4px 12px' });
+  const labelStyle: React.CSSProperties = { color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' };
+  const btnStyle = (color: string): React.CSSProperties => ({ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', background: color, color: '#ffffff', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.5 : 1, border: `1px solid ${color}`, padding: '4px 12px' });
   const sectionStyle: React.CSSProperties = { marginBottom: '20px' };
   const fieldGap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '10px' };
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', padding: '20px 24px', background: 'var(--bg-primary)' }}>
-      {message && <div style={{ marginBottom: '12px', padding: '8px', fontSize: '11px', border: '1px solid var(--accent-emerald)', color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)' }}>{message}</div>}
+      {message && <div style={{ marginBottom: '12px', padding: '8px', fontSize: '12px', border: '1px solid var(--accent-emerald)', color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)' }}>{message}</div>}
 
       {/* Two-column layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
@@ -174,18 +174,18 @@ export default function SettingsView() {
             <div style={{ ...fieldGap, marginTop: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input type="checkbox" checked={identity.tunnel?.enabled || false} onChange={(e) => setIdentity({ ...identity, tunnel: { ...identity.tunnel, enabled: e.target.checked } })} style={{ accentColor: '#22d3ee' }} />
-                <span style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)' }}>Enable ngrok tunnel</span>
+                <span style={{ fontSize: '12px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)' }}>Enable ngrok tunnel</span>
               </div>
               {tunnelUrl ? (
                 <div style={{ padding: '10px', border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.05)' }}>
-                  <div style={{ fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)', marginBottom: '6px' }}>TUNNEL ACTIVE</div>
+                  <div style={{ fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)', marginBottom: '6px' }}>TUNNEL ACTIVE</div>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <input type="text" value={tunnelUrl} readOnly style={{ ...inputStyle, flex: 1, userSelect: 'text', WebkitUserSelect: 'text' } as any} />
                     <button onClick={() => { navigator.clipboard.writeText(tunnelUrl); setMessage('Tunnel URL copied'); setTimeout(() => setMessage(''), 2000); }} style={btnStyle('var(--accent-emerald)')}>Copy</button>
                   </div>
                 </div>
               ) : (
-                <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>No active tunnel</span>
+                <span style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>No active tunnel</span>
               )}
               <div>
                 <label style={labelStyle}>ngrok Auth Token</label>
@@ -199,7 +199,7 @@ export default function SettingsView() {
               }} disabled={saving} style={btnStyle('#22d3ee')}>
                 {saving ? 'Saving...' : 'Save Tunnel Config'}
               </button>
-              <span style={{ fontSize: '10px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                 Restart the agent after saving for tunnel changes to take effect.
               </span>
             </div>
@@ -237,7 +237,7 @@ export default function SettingsView() {
             <div style={{ ...fieldGap, marginTop: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input type="checkbox" checked={identity.backup?.enabled || false} onChange={(e) => setIdentity({ ...identity, backup: { ...identity.backup, enabled: e.target.checked, remote_url: identity.backup?.remote_url || '', schedule: identity.backup?.schedule || '24h' } })} style={{ accentColor: 'var(--accent-emerald)' }} />
-                <span style={{ fontSize: '11px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)' }}>Enable GitHub backup</span>
+                <span style={{ fontSize: '12px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)' }}>Enable GitHub backup</span>
               </div>
               {identity.backup?.enabled && (
                 <>
@@ -263,7 +263,7 @@ export default function SettingsView() {
           {/* Appearance */}
           <div style={sectionStyle}>
             <span className="section-title" style={{ color: 'var(--fg-tertiary)' }}>{'// APPEARANCE'}</span>
-            <p style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', marginTop: '10px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', marginTop: '10px' }}>
               Use the moon/sun icon in the title bar to toggle dark/light mode.
             </p>
           </div>

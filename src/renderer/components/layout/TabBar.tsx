@@ -9,7 +9,7 @@ const TABS = [
   { id: 'channels', label: 'Channels' },
   { id: 'heartbeat', label: 'Heartbeat' },
   { id: 'brain', label: 'Brain' },
-  { id: 'bus', label: 'Bus' },
+  { id: 'bus', label: 'Dispatch' },
   { id: 'settings', label: 'Settings' },
 ] as const;
 
@@ -36,10 +36,10 @@ export default function TabBar({ activeTab, onTabChange }: TabBarProps) {
           className="px-3 py-2 transition-colors relative"
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: '9px',
-            letterSpacing: '2px',
+            fontSize: '11px',
+            letterSpacing: '1.5px',
             textTransform: 'uppercase',
-            color: activeTab === tab.id ? 'var(--accent-emerald)' : 'var(--fg-muted)',
+            color: activeTab === tab.id ? 'var(--accent-emerald)' : 'var(--fg-secondary)',
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',

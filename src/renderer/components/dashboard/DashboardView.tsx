@@ -49,23 +49,23 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent, agents: regis
         </span>
         <div className="flex items-center gap-3">
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px',
-            textTransform: 'uppercase', color: 'var(--fg-muted)',
+            fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px',
+            textTransform: 'uppercase', color: 'var(--fg-secondary)',
           }}>
             {fleetStatus.agents.length} agent{fleetStatus.agents.length !== 1 ? 's' : ''}
           </span>
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px',
-            textTransform: 'uppercase', color: 'var(--fg-muted)',
+            fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px',
+            textTransform: 'uppercase', color: 'var(--fg-secondary)',
           }}>
             uptime {fleetStatus.uptime}
           </span>
         </div>
       </div>
 
-      {/* Agent cards — responsive columns based on count */}
-      <div className="grid gap-3 mb-4" style={{
-        gridTemplateColumns: `repeat(auto-fill, minmax(${fleetStatus.agents.length <= 4 ? '240px' : '180px'}, 1fr))`,
+      {/* Agent cards — 3 column grid */}
+      <div className="grid gap-2 mb-4" style={{
+        gridTemplateColumns: 'repeat(3, 1fr)',
       }}>
         {fleetStatus.agents.map((agent) => {
           const isActive = activeAgent?.toLowerCase() === agent.name.toLowerCase();
@@ -75,10 +75,11 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent, agents: regis
             <button
               key={agent.name}
               onClick={() => setActiveAgent(agent.name)}
-              className="p-3 border text-left transition-colors"
+              className="p-3 text-left transition-colors"
               style={{
-                background: isActive ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
-                borderColor: isActive ? (isRemote ? 'var(--accent-cyan)' : 'var(--accent-emerald)') : 'var(--border-color)',
+                background: isActive ? 'var(--bg-tertiary)' : 'transparent',
+                border: '1px solid',
+                borderColor: isActive ? 'var(--border-color-hover)' : 'var(--border-color)',
                 cursor: 'pointer',
               }}
             >
@@ -88,31 +89,31 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent, agents: regis
                   backgroundColor: agent.status === 'running' ? '#10b981' : agent.status === 'error' ? '#ef4444' : '#6b7280',
                 }} />
                 <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600,
-                  color: isActive ? (isRemote ? 'var(--accent-cyan)' : 'var(--accent-emerald)') : 'var(--fg-primary)',
+                  fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600,
+                  color: 'var(--fg-primary)',
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                 }}>
                   {agent.name}
                 </span>
                 {isRemote && (
                   <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: '7px', letterSpacing: '0.5px',
-                    textTransform: 'uppercase', color: '#22d3ee',
-                    border: '1px solid #22d3ee', padding: '0px 3px', lineHeight: '14px',
+                    fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.5px',
+                    textTransform: 'uppercase', color: 'var(--accent-cyan)',
+                    border: '1px solid rgba(34, 211, 238, 0.3)', padding: '1px 4px', lineHeight: '14px',
                   }}>
                     REMOTE
                   </span>
                 )}
                 <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '1px',
+                  fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '1px',
                   textTransform: 'uppercase',
-                  color: isRemote ? (agent.status === 'running' ? '#22d3ee' : statusColor(agent.status)) : statusColor(agent.status),
+                  color: statusColor(agent.status),
                   marginLeft: 'auto',
                 }}>
                   {isRemote ? (agent.status === 'running' ? 'remote' : agent.status) : agent.status}
                 </span>
                 {!isRemote && agent.uptime && (
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', color: 'var(--fg-muted)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--fg-secondary)' }}>
                     {agent.uptime}
                   </span>
                 )}
@@ -153,6 +154,7 @@ export default function DashboardView() {
   const { health, cliStatus, fleetMode, fleetStatus, agents, activeAgent, setActiveAgent, agentRoot, runningAgentRoot } = useApp();
   const kb = (window as any).kyberbot;
   const [logs, setLogs] = useState<string[]>([]);
+  const [logsOpen, setLogsOpen] = useState(false);
   const [selectedFleetAgents, setSelectedFleetAgents] = useState<Set<string>>(new Set());
   const logContainerRef = useRef<HTMLDivElement>(null);
 
@@ -213,8 +215,8 @@ export default function DashboardView() {
           {isRemoteAgent && (
             <span style={{
               fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.5px',
-              textTransform: 'uppercase', color: '#22d3ee',
-              border: '1px solid #22d3ee', padding: '1px 5px', lineHeight: '14px',
+              textTransform: 'uppercase', color: 'var(--accent-cyan)',
+              border: '1px solid var(--accent-cyan)', padding: '1px 5px', lineHeight: '14px',
             }}>
               REMOTE
             </span>
@@ -222,7 +224,7 @@ export default function DashboardView() {
         </div>
         <div className="flex items-center gap-2">
           {/* Status badge */}
-          <span className="text-[9px] tracking-[1px] uppercase" style={{
+          <span className="text-[11px] tracking-[1px] uppercase" style={{
             fontFamily: 'var(--font-mono)',
             color: isRemoteAgent
               ? (isRunning ? '#22d3ee' : 'var(--fg-muted)')
@@ -238,12 +240,12 @@ export default function DashboardView() {
                   await kb?.services.start();
                 }}
                 disabled={isRunning || isStarting || isStopping}
-                className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
+                className="px-4 py-2 text-[11px] tracking-[1px] uppercase border transition-colors"
                 style={{
                   fontFamily: 'var(--font-mono)',
                   borderColor: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-emerald)',
-                  color: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-emerald)',
-                  background: 'transparent',
+                  color: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : '#ffffff',
+                  background: isRunning || isStarting || isStopping ? 'transparent' : 'var(--accent-emerald)',
                   cursor: isRunning || isStarting || isStopping ? 'default' : 'pointer',
                   opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
                 }}
@@ -259,7 +261,7 @@ export default function DashboardView() {
                   }
                 }}
                 disabled={!isRunning || isStopping}
-                className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
+                className="px-4 py-2 text-[11px] tracking-[1px] uppercase border transition-colors"
                 style={{
                   fontFamily: 'var(--font-mono)',
                   borderColor: isRunning && !isStopping ? 'var(--status-error)' : 'var(--fg-muted)',
@@ -282,9 +284,9 @@ export default function DashboardView() {
           <div key={svc.name} className="p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
             <div className="flex items-center gap-2 mb-1">
               <div className={`status-dot ${statusDot(svc.status)}`} />
-              <span className="text-[11px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{svc.name}</span>
+              <span className="text-[13px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{svc.name}</span>
             </div>
-            <span className="text-[9px] uppercase tracking-[1px]" style={{ color: statusColor(svc.status) }}>{svc.status}</span>
+            <span className="text-[11px] uppercase tracking-[1px]" style={{ color: statusColor(svc.status) }}>{svc.status}</span>
           </div>
         ))}
       </div>
@@ -295,15 +297,15 @@ export default function DashboardView() {
           <span className="section-title" style={{ color: 'var(--accent-cyan)' }}>{'// HEALTH'}</span>
           <div className="grid grid-cols-3 gap-3 mt-2">
             <div className="p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-              <div className="text-[9px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Uptime</div>
+              <div className="text-[11px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-secondary)' }}>Uptime</div>
               <div className="text-[13px]" style={{ fontFamily: 'var(--font-mono)' }}>{health.uptime}</div>
             </div>
             <div className="p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-              <div className="text-[9px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Channels</div>
+              <div className="text-[11px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-secondary)' }}>Channels</div>
               <div className="text-[13px]" style={{ fontFamily: 'var(--font-mono)' }}>{(health.channels || []).filter(c => c.connected).length}/{(health.channels || []).length}</div>
             </div>
             <div className="p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-              <div className="text-[9px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>PID</div>
+              <div className="text-[11px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-secondary)' }}>PID</div>
               <div className="text-[13px]" style={{ fontFamily: 'var(--font-mono)' }}>{health.pid}</div>
             </div>
           </div>
@@ -316,7 +318,7 @@ export default function DashboardView() {
           <div className="flex items-center justify-between mb-3">
             <span className="section-title" style={{ color: 'var(--accent-cyan)' }}>{'// FLEET MODE'}</span>
             <div className="flex items-center gap-2">
-              <span className="text-[9px] tracking-[1px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>
+              <span className="text-[11px] tracking-[1px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>
                 {selectedFleetAgents.size}/{agents.length} selected
               </span>
               {agents.length >= 2 && !isStarting && (
@@ -328,12 +330,12 @@ export default function DashboardView() {
                     }
                   }}
                   disabled={isRunning || isStarting || isStopping || selectedFleetAgents.size === 0}
-                  className="px-3 py-1 text-[9px] tracking-[1px] uppercase border transition-colors"
+                  className="px-4 py-2 text-[11px] tracking-[1px] uppercase border transition-colors"
                   style={{
                     fontFamily: 'var(--font-mono)',
                     borderColor: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'var(--fg-muted)' : 'var(--accent-cyan)',
-                    color: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'var(--fg-muted)' : 'var(--accent-cyan)',
-                    background: 'transparent',
+                    color: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'var(--fg-muted)' : '#ffffff',
+                    background: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'transparent' : 'var(--accent-cyan)',
                     cursor: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'default' : 'pointer',
                     opacity: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 0.3 : 1,
                   }}
@@ -344,7 +346,7 @@ export default function DashboardView() {
             </div>
           </div>
 
-          <div className="space-y-1">
+          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
             {agents.map((agent: any) => {
               const isSelected = selectedFleetAgents.has(agent.name);
               const toggleSelect = () => {
@@ -356,7 +358,7 @@ export default function DashboardView() {
                 });
               };
               return (
-                <div key={agent.name} className="flex items-center justify-between p-2 border" style={{ background: 'var(--bg-secondary)', borderColor: isSelected ? 'rgba(34,211,238,0.2)' : 'var(--border-color)' }}>
+                <div key={agent.name} className="flex items-center justify-between p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -364,11 +366,11 @@ export default function DashboardView() {
                       onChange={toggleSelect}
                       style={{ accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
                     />
-                    <span className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: isSelected ? 'var(--fg-primary)' : 'var(--fg-muted)' }}>{agent.name}</span>
+                    <span className="text-[12px]" style={{ fontFamily: 'var(--font-mono)', color: isSelected ? 'var(--fg-primary)' : 'var(--fg-secondary)' }}>{agent.name}</span>
                     {agent.type === 'remote' && (
-                      <span style={{ fontSize: '7px', letterSpacing: '0.5px', textTransform: 'uppercase', color: '#22d3ee', border: '1px solid #22d3ee', padding: '0px 3px', fontFamily: 'var(--font-mono)', lineHeight: '12px' }}>REMOTE</span>
+                      <span style={{ fontSize: '9px', letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', padding: '1px 4px', fontFamily: 'var(--font-mono)', lineHeight: '14px' }}>REMOTE</span>
                     )}
-                    <span className="text-[9px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>
+                    <span className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>
                       {agent.type === 'remote' ? (agent.remoteUrl || '') : (agent.root || '').replace(/^\/Users\/[^/]+\//, '~/')}
                     </span>
                   </div>
@@ -397,33 +399,54 @@ export default function DashboardView() {
         </div>
       )}
 
-      {/* Log Viewer — persistent for entire session */}
+      {/* Log Viewer — collapsible */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span className="section-title" style={{ color: 'var(--fg-tertiary)' }}>{'// LOGS'}</span>
-          <button
-            onClick={() => { navigator.clipboard.writeText(logs.join('\n')); }}
-            style={{ fontSize: '9px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', background: 'transparent', border: 'none', cursor: 'pointer', opacity: logs.length ? 1 : 0.3 }}
-          >
-            Copy
-          </button>
-        </div>
-        <div ref={logContainerRef} className="mt-2 border" style={{ maxHeight: '300px', overflowY: 'auto', overflowX: 'auto', borderColor: 'var(--border-color)', background: '#0a0a0a' }}>
-          <div style={{ padding: '8px', minWidth: '700px' }}>
-            {logs.length === 0 && (
-              <span style={{ fontSize: '9px', color: 'var(--fg-muted)', fontFamily: 'Menlo, Monaco, Consolas, monospace' }}>
-                {isRunning ? 'Waiting for log output...' : 'Start services to see logs'}
+        <button
+          onClick={() => setLogsOpen(!logsOpen)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            width: '100%', background: 'transparent', border: 'none', cursor: 'pointer',
+            padding: '4px 0',
+          }}
+        >
+          <span className="section-title" style={{ color: 'var(--fg-tertiary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {'// LOGS'}
+            <span style={{ fontSize: '10px', fontWeight: 400, letterSpacing: '0' }}>
+              {logsOpen ? '▾' : '▸'}
+            </span>
+            {!logsOpen && logs.length > 0 && (
+              <span style={{ fontSize: '10px', fontWeight: 400, letterSpacing: '0', color: 'var(--fg-muted)' }}>
+                ({logs.length} lines)
               </span>
             )}
-            {logs.map((line, i) => (
-              <div
-                key={i}
-                style={{ fontSize: '12px', lineHeight: '17px', whiteSpace: 'pre', fontFamily: 'Menlo, Monaco, Consolas, monospace' }}
-                dangerouslySetInnerHTML={{ __html: ansiConverter.toHtml(line) }}
-              />
-            ))}
+          </span>
+          {logsOpen && (
+            <span
+              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(logs.join('\n')); }}
+              style={{ fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', cursor: 'pointer', opacity: logs.length ? 1 : 0.3 }}
+            >
+              Copy
+            </span>
+          )}
+        </button>
+        {logsOpen && (
+          <div ref={logContainerRef} className="mt-2 border" style={{ maxHeight: '300px', overflowY: 'auto', overflowX: 'auto', borderColor: 'var(--border-color)', background: '#0a0a0a' }}>
+            <div style={{ padding: '8px', minWidth: '700px' }}>
+              {logs.length === 0 && (
+                <span style={{ fontSize: '11px', color: '#64748b', fontFamily: 'Menlo, Monaco, Consolas, monospace' }}>
+                  {isRunning ? 'Waiting for log output...' : 'Start services to see logs'}
+                </span>
+              )}
+              {logs.map((line, i) => (
+                <div
+                  key={i}
+                  style={{ fontSize: '12px', lineHeight: '17px', whiteSpace: 'pre', fontFamily: 'Menlo, Monaco, Consolas, monospace', color: '#a1a1aa' }}
+                  dangerouslySetInnerHTML={{ __html: ansiConverter.toHtml(line) }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

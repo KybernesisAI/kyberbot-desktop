@@ -133,7 +133,7 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
                 {installing === 'Claude Code' ? 'INSTALLING...' : 'INSTALL'}
               </button>
             ) : (
-              <span style={{ fontSize: '9px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Install Node.js first</span>
+              <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Install Node.js first</span>
             )
           }
         />
@@ -154,7 +154,7 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
                 {installing === 'KyberBot' ? 'INSTALLING...' : 'INSTALL'}
               </button>
             ) : (
-              <span style={{ fontSize: '9px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Install Node.js first</span>
+              <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Install Node.js first</span>
             )
           }
         />
@@ -162,13 +162,13 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
 
       {/* Install log */}
       {installLog && (
-        <div style={{ marginTop: '16px', padding: '8px 12px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: installing ? 'var(--accent-amber)' : 'var(--accent-emerald)', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', maxWidth: '480px', width: '100%' }}>
+        <div style={{ marginTop: '16px', padding: '8px 12px', fontSize: '12px', fontFamily: 'var(--font-mono)', color: installing ? 'var(--accent-amber)' : 'var(--accent-emerald)', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', maxWidth: '480px', width: '100%' }}>
           {installLog}
         </div>
       )}
 
       {/* Status */}
-      <div style={{ marginTop: '20px', fontSize: '9px', letterSpacing: '1px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>
+      <div style={{ marginTop: '20px', fontSize: '11px', letterSpacing: '1px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>
         {!status ? 'CHECKING...' : allOk ? 'ALL PREREQUISITES MET' : 'AUTO-REFRESHING EVERY 3 SECONDS...'}
       </div>
     </div>
@@ -198,12 +198,12 @@ function PrereqCard({ label, ok, version, description, detail, notInstalledActio
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: ok ? 'var(--status-success)' : 'var(--fg-primary)' }}>{label}</span>
-            {version && <span style={{ fontSize: '9px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{version}</span>}
+            {version && <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{version}</span>}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--fg-tertiary)', fontFamily: 'var(--font-sans)', fontWeight: 300, marginTop: '2px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--fg-tertiary)', fontFamily: 'var(--font-sans)', fontWeight: 300, marginTop: '2px' }}>
             {description}
           </div>
-          {detail && <div style={{ fontSize: '10px', color: 'var(--status-warning)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>{detail}</div>}
+          {detail && <div style={{ fontSize: '11px', color: 'var(--status-warning)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>{detail}</div>}
         </div>
         {!ok && notInstalledAction && (
           <div style={{ flexShrink: 0 }}>
@@ -217,13 +217,13 @@ function PrereqCard({ label, ok, version, description, detail, notInstalledActio
 
 const installBtnStyle: React.CSSProperties = {
   padding: '4px 10px',
-  fontSize: '9px',
+  fontSize: '11px',
   letterSpacing: '0.5px',
   textTransform: 'uppercase',
   fontFamily: 'var(--font-mono)',
+  background: 'var(--accent-emerald)',
+  color: '#ffffff',
   border: '1px solid var(--accent-emerald)',
-  color: 'var(--accent-emerald)',
-  background: 'transparent',
   cursor: 'pointer',
   whiteSpace: 'nowrap',
 };

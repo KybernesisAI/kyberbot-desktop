@@ -93,10 +93,10 @@ export default function MemoryBlocks() {
 
   return (
     <>
-      <div style={{ border: '1px solid var(--border-color)', padding: '12px', background: 'var(--bg-primary)' }}>
+      <div style={{ border: '1px solid var(--border-color)', padding: '12px', background: 'var(--bg-secondary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-          <span style={{ fontSize: '9px', letterSpacing: '2px', color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>MEMORY_BLOCKS</span>
-          <span style={{ fontSize: '9px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{BLOCKS.length}</span>
+          <span style={{ fontSize: '11px', letterSpacing: '1.5px', color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>MEMORY_BLOCKS</span>
+          <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{BLOCKS.length}</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {BLOCKS.map(name => {
@@ -111,11 +111,11 @@ export default function MemoryBlocks() {
                 onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border-color)')}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[9px] tracking-[1px] px-1 py-0.5 border" style={{ fontFamily: 'var(--font-mono)', color: meta.color, borderColor: `${meta.color}40`, background: `${meta.color}10` }}>{meta.label}</span>
-                  <span className="text-[9px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{block.content.length}</span>
+                  <span className="text-[10px] tracking-[1px] px-1 py-0.5 border" style={{ fontFamily: 'var(--font-mono)', color: meta.color, borderColor: `${meta.color}40`, background: `${meta.color}10` }}>{meta.label}</span>
+                  <span className="text-[10px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{block.content.length}</span>
                 </div>
-                <p className="text-[9px] mb-1.5" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>{meta.description}</p>
-                <p className="text-[11px] line-clamp-3" style={{ color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>
+                <p className="text-[10px] mb-1.5" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>{meta.description}</p>
+                <p className="text-[12px] line-clamp-3" style={{ color: 'var(--fg-secondary)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>
                   {block.content || <span style={{ color: 'var(--fg-muted)', fontStyle: 'italic' }}>Click to add content...</span>}
                 </p>
               </div>

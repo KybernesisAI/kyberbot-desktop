@@ -133,7 +133,7 @@ export default function EntityBrowser() {
             <button
               key={type}
               onClick={() => toggleType(type)}
-              className="px-1.5 py-0.5 text-[8px] tracking-[0.5px] uppercase border"
+              className="px-1.5 py-0.5 text-[10px] tracking-[0.5px] uppercase border"
               style={{
                 fontFamily: 'var(--font-mono)',
                 borderColor: activeTypes.has(type) ? `${color}60` : 'var(--border-color)',
@@ -147,7 +147,7 @@ export default function EntityBrowser() {
           ))}
           <div className="w-full flex gap-1 mt-1">
             {(['mentions', 'recent', 'alpha'] as const).map(s => (
-              <button key={s} onClick={() => setSort(s)} className="text-[7px] tracking-[0.5px] uppercase" style={{ fontFamily: 'var(--font-mono)', color: sort === s ? 'var(--accent-emerald)' : 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <button key={s} onClick={() => setSort(s)} className="text-[10px] tracking-[0.5px] uppercase" style={{ fontFamily: 'var(--font-mono)', color: sort === s ? 'var(--accent-emerald)' : 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
                 {s === 'alpha' ? 'A-Z' : s.toUpperCase()}
               </button>
             ))}
@@ -156,7 +156,7 @@ export default function EntityBrowser() {
 
         {/* Entity cards */}
         <div className="flex-1 overflow-y-auto">
-          {loading && <div className="p-2 text-[9px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Loading...</div>}
+          {loading && <div className="p-2 text-[12px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Loading...</div>}
           {entities.map(entity => {
             const color = TYPE_COLORS[entity.type] || '#71717a';
             const isSelected = entity.id === selectedId;
@@ -173,16 +173,16 @@ export default function EntityBrowser() {
                 onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
               >
                 <div style={{ width: '6px', height: '6px', borderRadius: '9999px', background: color, flexShrink: 0, boxShadow: isSelected ? `0 0 6px ${color}80` : 'none' }} />
-                <span className="flex-1 truncate text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{entity.name}</span>
-                <span className="text-[8px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{timeAgo(entity.last_seen)}</span>
-                <span className="text-[8px] px-1" style={{ color, background: `${color}15`, fontFamily: 'var(--font-mono)' }}>{entity.mention_count}</span>
+                <span className="flex-1 truncate text-[12px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{entity.name}</span>
+                <span className="text-[10px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{timeAgo(entity.last_seen)}</span>
+                <span className="text-[10px] px-1" style={{ color, background: `${color}15`, fontFamily: 'var(--font-mono)' }}>{entity.mention_count}</span>
               </div>
             );
           })}
         </div>
 
         {/* Count */}
-        <div className="px-2 py-1 border-t text-[8px]" style={{ borderColor: 'var(--border-color)', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+        <div className="px-2 py-1 border-t text-[10px]" style={{ borderColor: 'var(--border-color)', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
           {entities.length} entities
         </div>
       </div>
@@ -191,7 +191,7 @@ export default function EntityBrowser() {
       <div style={{ overflowY: 'auto', overflowX: 'hidden' }}>
         {!context ? (
           <div className="h-full flex items-center justify-center">
-            <span className="text-[11px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Select an entity</span>
+            <span className="text-[12px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Select an entity</span>
           </div>
         ) : (
           <div className="p-4">
@@ -199,11 +199,11 @@ export default function EntityBrowser() {
             <div className="mb-4">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[16px] font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{context.entity.name}</span>
-                <span className="text-[8px] tracking-[0.5px] uppercase px-1.5 py-0.5 border" style={{ fontFamily: 'var(--font-mono)', color: TYPE_COLORS[context.entity.type] || '#71717a', borderColor: `${TYPE_COLORS[context.entity.type] || '#71717a'}40`, background: `${TYPE_COLORS[context.entity.type] || '#71717a'}10` }}>
+                <span className="text-[10px] tracking-[0.5px] uppercase px-1.5 py-0.5 border" style={{ fontFamily: 'var(--font-mono)', color: TYPE_COLORS[context.entity.type] || '#71717a', borderColor: `${TYPE_COLORS[context.entity.type] || '#71717a'}40`, background: `${TYPE_COLORS[context.entity.type] || '#71717a'}10` }}>
                   {context.entity.type}
                 </span>
                 {context.entity.tier && (
-                  <span className="text-[8px] tracking-[0.5px] uppercase px-1.5 py-0.5" style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)', background: 'rgba(245,158,11,0.1)' }}>{context.entity.tier}</span>
+                  <span className="text-[10px] tracking-[0.5px] uppercase px-1.5 py-0.5" style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)', background: 'rgba(245,158,11,0.1)' }}>{context.entity.tier}</span>
                 )}
               </div>
 
@@ -216,7 +216,7 @@ export default function EntityBrowser() {
                   ['LAST SEEN', context.entity.last_seen ? new Date(context.entity.last_seen).toLocaleDateString() : '—'],
                 ].map(([label, value]) => (
                   <div key={label as string}>
-                    <div className="text-[7px] tracking-[1px] uppercase mb-0.5" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{label}</div>
+                    <div className="text-[10px] tracking-[1px] uppercase mb-0.5" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{label}</div>
                     <div className="text-[13px] font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{value}</div>
                   </div>
                 ))}
@@ -226,7 +226,7 @@ export default function EntityBrowser() {
             {/* Confidence bar */}
             {context.entity.priority != null && (
               <div className="mb-4">
-                <div className="text-[7px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>CONFIDENCE</div>
+                <div className="text-[10px] tracking-[1px] uppercase mb-1" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>CONFIDENCE</div>
                 <div className="h-1.5 w-full" style={{ background: 'var(--bg-tertiary)' }}>
                   <div
                     className="h-full"
@@ -242,11 +242,11 @@ export default function EntityBrowser() {
             {/* Contradictions */}
             {context.contradictions && context.contradictions.length > 0 && (
               <div className="mb-4 p-2 border" style={{ borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
-                <div className="text-[9px] tracking-[1px] uppercase mb-2" style={{ color: '#f59e0b', fontFamily: 'var(--font-mono)' }}>
+                <div className="text-[11px] tracking-[1.5px] uppercase mb-2" style={{ color: '#f59e0b', fontFamily: 'var(--font-mono)' }}>
                   {`// CONTRADICTIONS (${context.contradictions.length})`}
                 </div>
                 {context.contradictions.map((c: any, i: number) => (
-                  <div key={i} className="text-[11px] mb-1" style={{ color: 'var(--fg-secondary)' }}>{c.description || c.fact_a || JSON.stringify(c).slice(0, 150)}</div>
+                  <div key={i} className="text-[12px] mb-1" style={{ color: 'var(--fg-secondary)' }}>{c.description || c.fact_a || JSON.stringify(c).slice(0, 150)}</div>
                 ))}
               </div>
             )}
@@ -254,12 +254,12 @@ export default function EntityBrowser() {
             {/* Facts */}
             {context.facts && context.facts.length > 0 && (
               <div className="mb-4">
-                <div className="text-[9px] tracking-[1px] uppercase mb-2" style={{ color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)' }}>
+                <div className="text-[11px] tracking-[1.5px] uppercase mb-2" style={{ color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)' }}>
                   {`// FACTS (${context.facts.length})`}
                 </div>
                 {context.facts.map((f: any, i: number) => (
                   <div key={i} className="flex items-start gap-2 py-1 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                    <span className="text-[7px] tracking-[0.5px] uppercase px-1 py-0.5 mt-0.5" style={{
+                    <span className="text-[10px] tracking-[0.5px] uppercase px-1 py-0.5 mt-0.5" style={{
                       fontFamily: 'var(--font-mono)',
                       color: f.source_type === 'corrected' ? '#10b981' : f.source_type === 'confirmed' ? '#22d3ee' : 'var(--fg-muted)',
                       background: f.source_type === 'corrected' ? 'rgba(16,185,129,0.1)' : f.source_type === 'confirmed' ? 'rgba(34,211,238,0.1)' : 'var(--bg-tertiary)',
@@ -267,7 +267,7 @@ export default function EntityBrowser() {
                     }}>
                       {(f.source_type || 'fact').slice(0, 4)}
                     </span>
-                    <span className="text-[11px]" style={{ color: 'var(--fg-secondary)' }}>{f.content || f.fact || JSON.stringify(f).slice(0, 200)}</span>
+                    <span className="text-[12px]" style={{ color: 'var(--fg-secondary)' }}>{f.content || f.fact || JSON.stringify(f).slice(0, 200)}</span>
                   </div>
                 ))}
               </div>
@@ -276,7 +276,7 @@ export default function EntityBrowser() {
             {/* Relationships */}
             {context.related_entities && context.related_entities.length > 0 && (
               <div className="mb-4">
-                <div className="text-[9px] tracking-[1px] uppercase mb-2" style={{ color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+                <div className="text-[11px] tracking-[1.5px] uppercase mb-2" style={{ color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
                   {`// RELATIONSHIPS (${context.related_entities.length})`}
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
@@ -288,14 +288,14 @@ export default function EntityBrowser() {
                     const relColor = TYPE_COLORS[relType] || '#71717a';
                     return (
                       <div key={i} className="flex items-center gap-2 py-1" onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')} style={{ cursor: 'pointer' }} onClick={() => relId && selectEntity(relId)}>
-                        <span className="text-[9px]" style={{ color: 'var(--fg-muted)' }}>{'\u2194'}</span>
-                        <span className="text-[8px] px-1 py-0.5 border" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-violet)', borderColor: 'rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.1)' }}>
+                        <span className="text-[11px]" style={{ color: 'var(--fg-muted)' }}>{'\u2194'}</span>
+                        <span className="text-[10px] px-1 py-0.5 border" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-violet)', borderColor: 'rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.1)' }}>
                           {rel.relationship || 'related'}
                         </span>
-                        <span className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: relColor }}>{relName}</span>
-                        <span className="text-[8px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>({relType})</span>
+                        <span className="text-[12px]" style={{ fontFamily: 'var(--font-mono)', color: relColor }}>{relName}</span>
+                        <span className="text-[10px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>({relType})</span>
                         {rel.strength != null && (
-                          <span className="text-[8px] ml-auto" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>×{rel.strength}</span>
+                          <span className="text-[10px] ml-auto" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>×{rel.strength}</span>
                         )}
                       </div>
                     );
@@ -307,17 +307,17 @@ export default function EntityBrowser() {
             {/* Mentions timeline */}
             {context.mentions && context.mentions.length > 0 && (
               <div>
-                <div className="text-[9px] tracking-[1px] uppercase mb-2" style={{ color: 'var(--accent-teal, #14b8a6)', fontFamily: 'var(--font-mono)' }}>
+                <div className="text-[11px] tracking-[1.5px] uppercase mb-2" style={{ color: 'var(--accent-teal, #14b8a6)', fontFamily: 'var(--font-mono)' }}>
                   {`// MENTIONS (${context.mentions.length})`}
                 </div>
                 {context.mentions.slice(0, 20).map((m: any, i: number) => (
                   <div key={i} className="flex items-start gap-2 py-1">
                     <div style={{ width: '4px', height: '4px', borderRadius: '9999px', background: 'var(--accent-emerald)', marginTop: '5px', flexShrink: 0 }} />
                     <div>
-                      <div className="text-[8px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                      <div className="text-[10px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                         {new Date(m.timestamp || m.created_at).toLocaleString()}
                       </div>
-                      <div className="text-[10px]" style={{ color: 'var(--fg-secondary)' }}>
+                      <div className="text-[11px]" style={{ color: 'var(--fg-secondary)' }}>
                         {(m.context || m.content || '').slice(0, 200)}
                       </div>
                     </div>

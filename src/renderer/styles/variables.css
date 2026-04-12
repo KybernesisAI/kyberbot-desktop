@@ -78,10 +78,10 @@
 
 /* Light theme — matching Kybernesis web light mode */
 html.light {
-  /* Backgrounds: cream page, white cards, barely-tinted inputs */
-  --bg-primary: #F0EFEA;
+  /* Backgrounds: very subtle warm tint, white cards */
+  --bg-primary: #faf9f7;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #f5f4f1;
+  --bg-tertiary: #f5f4f2;
   --bg-elevated: #ffffff;
 
   /*
@@ -96,9 +96,9 @@ html.light {
   --fg-tertiary: #64748b;
   --fg-muted: #94a3b8;
 
-  /* Warm borders that complement the cream */
-  --border-color: #ddd9d0;
-  --border-color-hover: #c8c4bb;
+  /* Subtle borders */
+  --border-color: #e8e6e1;
+  --border-color-hover: #d5d3ce;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08);

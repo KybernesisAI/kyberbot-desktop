@@ -152,8 +152,8 @@ export default function TitleBar() {
     gap: '8px',
     width: '100%',
     textAlign: 'left',
-    padding: '6px 12px',
-    fontSize: '11px',
+    padding: '8px 14px',
+    fontSize: '13px',
     fontFamily: 'var(--font-mono)',
     color: 'var(--fg-secondary)',
     background: 'transparent',
@@ -174,8 +174,39 @@ export default function TitleBar() {
         position: 'relative',
       } as any}
     >
-      {/* Spacer for native macOS stoplight buttons */}
-      <div style={{ width: '70px', flexShrink: 0 }} />
+      {/* Custom stoplight buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, paddingLeft: '4px', WebkitAppRegion: 'no-drag' } as any}>
+        <button
+          onClick={() => (window as any).kyberbot.window.close()}
+          style={{
+            width: '12px', height: '12px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: 'var(--stoplight-close)', padding: 0,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+          title="Close"
+        />
+        <button
+          onClick={() => (window as any).kyberbot.window.minimize()}
+          style={{
+            width: '12px', height: '12px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: 'var(--stoplight-minimize)', padding: 0,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+          title="Minimize"
+        />
+        <button
+          onClick={() => (window as any).kyberbot.window.maximize()}
+          style={{
+            width: '12px', height: '12px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: 'var(--stoplight-maximize)', padding: 0,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+          title="Maximize"
+        />
+      </div>
 
       {/* Center: Agent name dropdown */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -187,10 +218,10 @@ export default function TitleBar() {
             background: 'transparent', border: 'none', cursor: 'pointer',
           } as any}
         >
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.15em', color: 'var(--accent-emerald)', textTransform: 'uppercase' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.15em', color: 'var(--accent-emerald)', textTransform: 'uppercase' }}>
             {`// ${agentName}`}
           </span>
-          <ChevronDown size={10} style={{ color: 'var(--fg-muted)' }} />
+          <ChevronDown size={12} style={{ color: 'var(--fg-secondary)' }} />
         </button>
       </div>
 
@@ -262,15 +293,15 @@ export default function TitleBar() {
           title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
           style={{
             background: 'transparent', border: 'none', cursor: 'pointer',
-            color: 'var(--fg-muted)', opacity: 0.4,
-            width: '20px', height: '20px',
+            color: 'var(--fg-secondary)', opacity: 0.6,
+            width: '24px', height: '24px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             transition: 'opacity 150ms',
           }}
           onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.4')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
         >
-          {isDark ? <Moon size={12} /> : <Sun size={12} />}
+          {isDark ? <Moon size={15} /> : <Sun size={15} />}
         </button>
       </div>
 
@@ -278,7 +309,7 @@ export default function TitleBar() {
       {showMenu && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowMenu(false)} />
-          <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 50, border: '1px solid var(--border-color)', background: 'var(--bg-elevated)', padding: '4px 0', minWidth: '240px', WebkitAppRegion: 'no-drag' } as any}>
+          <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', zIndex: 50, border: '1px solid var(--border-color)', background: 'var(--bg-elevated)', padding: '4px 0', minWidth: '280px', WebkitAppRegion: 'no-drag' } as any}>
 
             {/* Fleet agents */}
             {loadingFleet && (
@@ -295,10 +326,10 @@ export default function TitleBar() {
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 {agent.type === 'remote' ? (
-                  <Globe size={8} style={{ flexShrink: 0, color: agent.running ? '#22d3ee' : '#6b7280' }} />
+                  <Globe size={12} style={{ flexShrink: 0, color: agent.running ? 'var(--accent-cyan)' : '#6b7280' }} />
                 ) : (
                   <Circle
-                    size={6}
+                    size={8}
                     fill={
                       fleetMode
                         ? (agent.running ? '#10b981' : '#6b7280')
@@ -320,15 +351,15 @@ export default function TitleBar() {
                     </span>
                     {agent.type === 'remote' && (
                       <span style={{
-                        fontSize: '7px', letterSpacing: '0.5px', textTransform: 'uppercase',
-                        color: '#22d3ee', border: '1px solid #22d3ee', padding: '0px 3px',
+                        fontSize: '9px', letterSpacing: '0.5px', textTransform: 'uppercase',
+                        color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', opacity: 0.8, padding: '1px 4px',
                         fontFamily: 'var(--font-mono)', lineHeight: '14px',
                       }}>
                         REMOTE
                       </span>
                     )}
                   </div>
-                  <span style={{ fontSize: '9px', color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {agent.type === 'remote' ? (agent.remoteUrl || 'remote') : agent.root.replace(/^\/Users\/[^/]+\//, '~/')}
                   </span>
                 </div>
@@ -350,7 +381,7 @@ export default function TitleBar() {
               onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
-              <FolderOpen size={11} style={{ flexShrink: 0, opacity: 0.6 }} />
+              <FolderOpen size={14} style={{ flexShrink: 0, opacity: 0.6 }} />
               Browse...
             </button>
 
@@ -362,7 +393,7 @@ export default function TitleBar() {
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
-                <Globe size={11} style={{ flexShrink: 0 }} />
+                <Globe size={14} style={{ flexShrink: 0 }} />
                 Add Remote Agent
               </button>
             ) : (

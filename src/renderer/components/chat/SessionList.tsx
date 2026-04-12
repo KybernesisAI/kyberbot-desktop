@@ -65,12 +65,12 @@ export default function SessionList({ currentSessionId, onSelectSession, onNewSe
   if (loading) return <div className="text-[9px] animate-pulse" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>LOADING_SESSIONS...</div>;
 
   return (
-    <div style={{ border: '1px solid var(--border-color)', padding: '12px', background: 'var(--bg-primary)' }}>
+    <div style={{ border: '1px solid var(--border-color)', padding: '12px', background: 'var(--bg-secondary)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <span style={{ fontSize: '9px', letterSpacing: '2px', color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>RECENT_SESSIONS</span>
+        <span style={{ fontSize: '11px', letterSpacing: '1.5px', color: 'var(--fg-tertiary)', fontFamily: 'var(--font-mono)' }}>RECENT_SESSIONS</span>
         <button
           onClick={onNewSession}
-          className="text-[9px] tracking-[1px]"
+          className="text-[11px] tracking-[1px]"
           style={{ color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)', background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.6 }}
           onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
           onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
@@ -80,7 +80,7 @@ export default function SessionList({ currentSessionId, onSelectSession, onNewSe
       </div>
 
       {withMessages.length === 0 && (
-        <p className="text-[10px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>No conversations yet</p>
+        <p className="text-[11px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-sans)', fontWeight: 300 }}>No conversations yet</p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -98,14 +98,14 @@ export default function SessionList({ currentSessionId, onSelectSession, onNewSe
             onMouseEnter={(e) => { if (currentSessionId !== session.id) e.currentTarget.style.borderColor = 'var(--border-color-hover)'; }}
             onMouseLeave={(e) => { if (currentSessionId !== session.id) e.currentTarget.style.borderColor = 'var(--border-color)'; }}
           >
-            <p className="text-[11px] truncate mb-0.5" style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, color: 'var(--fg-primary)' }}>
+            <p className="text-[12px] truncate mb-0.5" style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, color: 'var(--fg-primary)' }}>
               {session.title || 'New conversation'}
             </p>
             <div className="flex items-center justify-between">
-              <span className="text-[8px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[10px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                 {session.message_count} msg{session.message_count !== 1 ? 's' : ''}
               </span>
-              <span className="text-[9px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[10px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
                 {formatRelativeTime(session.updated_at)}
               </span>
             </div>

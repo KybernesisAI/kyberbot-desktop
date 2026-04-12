@@ -31,19 +31,17 @@ function createWindow(): void {
   const bounds = store.getWindowBounds('main');
 
   mainWindow = new BrowserWindow({
-    width: bounds?.width ?? 1100,
-    height: bounds?.height ?? 750,
+    width: bounds?.width ?? 1300,
+    height: bounds?.height ?? 800,
     x: bounds?.x,
     y: bounds?.y,
     minWidth: 800,
     minHeight: 500,
     frame: false,
-    titleBarStyle: 'hidden',
     transparent: false,
     roundedCorners: false,
     backgroundColor: '#0a0a0a',
     resizable: true,
-    trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
