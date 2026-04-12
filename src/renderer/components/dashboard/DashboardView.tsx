@@ -83,7 +83,7 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent, agents: regis
                 cursor: 'pointer',
               }}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" style={{ marginBottom: '2px' }}>
                 <div style={{
                   width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
                   backgroundColor: agent.status === 'running' ? '#10b981' : agent.status === 'error' ? '#ef4444' : '#6b7280',
@@ -104,17 +104,23 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent, agents: regis
                     REMOTE
                   </span>
                 )}
+              </div>
+              {regAgent?.description && (
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--fg-muted)', lineHeight: '1.4', paddingLeft: '14px', marginBottom: '2px' }}>
+                  {isRemote ? 'Remote agent' : regAgent.description}
+                </div>
+              )}
+              <div className="flex items-center gap-2" style={{ paddingLeft: '14px' }}>
                 <span style={{
                   fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '1px',
                   textTransform: 'uppercase',
                   color: statusColor(agent.status),
-                  marginLeft: 'auto',
                 }}>
                   {isRemote ? (agent.status === 'running' ? 'remote' : agent.status) : agent.status}
                 </span>
                 {!isRemote && agent.uptime && (
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--fg-secondary)' }}>
-                    {agent.uptime}
+                    · {agent.uptime}
                   </span>
                 )}
               </div>
@@ -358,23 +364,24 @@ export default function DashboardView() {
                 });
               };
               return (
-                <div key={agent.name} className="flex items-center justify-between p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={toggleSelect}
-                      style={{ accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
-                    />
-                    <span className="text-[12px]" style={{ fontFamily: 'var(--font-mono)', color: isSelected ? 'var(--fg-primary)' : 'var(--fg-secondary)' }}>{agent.name}</span>
-                    {agent.type === 'remote' && (
-                      <span style={{ fontSize: '9px', letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', padding: '1px 4px', fontFamily: 'var(--font-mono)', lineHeight: '14px' }}>REMOTE</span>
-                    )}
-                    <span className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>
-                      {agent.type === 'remote' ? (agent.remoteUrl || '') : (agent.root || '').replace(/^\/Users\/[^/]+\//, '~/')}
-                    </span>
-                  </div>
-                  <button
+                <div key={agent.name} className="p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+                  <div className="flex items-center justify-between">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={toggleSelect}
+                        style={{ accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
+                      />
+                      <span className="text-[12px]" style={{ fontFamily: 'var(--font-mono)', color: isSelected ? 'var(--fg-primary)' : 'var(--fg-secondary)' }}>{agent.name}</span>
+                      {agent.type === 'remote' && (
+                        <span style={{ fontSize: '9px', letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', padding: '1px 4px', fontFamily: 'var(--font-mono)', lineHeight: '14px' }}>REMOTE</span>
+                      )}
+                      <span className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>
+                        {agent.type === 'remote' ? (agent.remoteUrl || '') : (agent.root || '').replace(/^\/Users\/[^/]+\//, '~/')}
+                      </span>
+                    </div>
+                    <button
                     onClick={async () => {
                       if (confirm(`Unregister "${agent.name}" from the fleet? This does not delete any files.`)) {
                         if (agent.type === 'remote') {
@@ -391,7 +398,13 @@ export default function DashboardView() {
                     onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
                   >
                     Unregister
-                  </button>
+                    </button>
+                  </div>
+                  {agent.description && (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--fg-muted)', lineHeight: '1.4', marginTop: '4px', paddingLeft: '22px' }}>
+                      {agent.type === 'remote' ? 'Remote agent' : agent.description}
+                    </div>
+                  )}
                 </div>
               );
             })}
