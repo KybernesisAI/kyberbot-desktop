@@ -257,19 +257,31 @@ export default function EntityBrowser() {
                 <div className="text-[11px] tracking-[1.5px] uppercase mb-2" style={{ color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)' }}>
                   {`// FACTS (${context.facts.length})`}
                 </div>
-                {context.facts.map((f: any, i: number) => (
-                  <div key={i} className="flex items-start gap-2 py-1 border-b" style={{ borderColor: 'var(--border-color)' }}>
-                    <span className="text-[10px] tracking-[0.5px] uppercase px-1 py-0.5 mt-0.5" style={{
-                      fontFamily: 'var(--font-mono)',
-                      color: f.source_type === 'corrected' ? '#10b981' : f.source_type === 'confirmed' ? '#22d3ee' : 'var(--fg-muted)',
-                      background: f.source_type === 'corrected' ? 'rgba(16,185,129,0.1)' : f.source_type === 'confirmed' ? 'rgba(34,211,238,0.1)' : 'var(--bg-tertiary)',
-                      flexShrink: 0,
-                    }}>
-                      {(f.source_type || 'fact').slice(0, 4)}
-                    </span>
-                    <span className="text-[12px]" style={{ color: 'var(--fg-secondary)' }}>{f.content || f.fact || JSON.stringify(f).slice(0, 200)}</span>
-                  </div>
-                ))}
+                {context.facts.map((f: any, i: number) => {
+                  const fSourcePath = f.source_path || '';
+                  const fIsWatched = fSourcePath.includes('file://watched/');
+                  const fFileName = fIsWatched ? fSourcePath.split('/').pop() : null;
+                  return (
+                    <div key={i} className="flex items-start gap-2 py-1 border-b" style={{ borderColor: 'var(--border-color)' }}>
+                      <span className="text-[10px] tracking-[0.5px] uppercase px-1 py-0.5 mt-0.5" style={{
+                        fontFamily: 'var(--font-mono)',
+                        color: f.source_type === 'corrected' ? '#10b981' : f.source_type === 'confirmed' ? '#22d3ee' : 'var(--fg-muted)',
+                        background: f.source_type === 'corrected' ? 'rgba(16,185,129,0.1)' : f.source_type === 'confirmed' ? 'rgba(34,211,238,0.1)' : 'var(--bg-tertiary)',
+                        flexShrink: 0,
+                      }}>
+                        {(f.source_type || 'fact').slice(0, 4)}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span className="text-[12px]" style={{ color: 'var(--fg-secondary)' }}>{f.content || f.fact || JSON.stringify(f).slice(0, 200)}</span>
+                        {fIsWatched && fFileName && (
+                          <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--accent-amber)', border: '1px solid var(--accent-amber)', padding: '0px 4px', lineHeight: '14px', opacity: 0.8, marginLeft: '6px' }}>
+                            {fFileName}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -310,19 +322,37 @@ export default function EntityBrowser() {
                 <div className="text-[11px] tracking-[1.5px] uppercase mb-2" style={{ color: 'var(--accent-teal, #14b8a6)', fontFamily: 'var(--font-mono)' }}>
                   {`// MENTIONS (${context.mentions.length})`}
                 </div>
-                {context.mentions.slice(0, 20).map((m: any, i: number) => (
-                  <div key={i} className="flex items-start gap-2 py-1">
-                    <div style={{ width: '4px', height: '4px', borderRadius: '9999px', background: 'var(--accent-emerald)', marginTop: '5px', flexShrink: 0 }} />
-                    <div>
-                      <div className="text-[10px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
-                        {new Date(m.timestamp || m.created_at).toLocaleString()}
-                      </div>
-                      <div className="text-[11px]" style={{ color: 'var(--fg-secondary)' }}>
-                        {(m.context || m.content || '').slice(0, 200)}
+                {context.mentions.slice(0, 20).map((m: any, i: number) => {
+                  const sourcePath = m.source_path || '';
+                  const isWatchedFolder = sourcePath.startsWith('file://watched/');
+                  const sourceFileName = isWatchedFolder ? sourcePath.split('/').pop() : null;
+                  const sourceChannel = sourcePath.startsWith('channel://') ? sourcePath.split('://')[1]?.split('/')[0] : null;
+                  return (
+                    <div key={i} className="flex items-start gap-2 py-1">
+                      <div style={{ width: '4px', height: '4px', borderRadius: '9999px', background: isWatchedFolder ? 'var(--accent-amber)' : 'var(--accent-emerald)', marginTop: '5px', flexShrink: 0 }} />
+                      <div>
+                        <div className="flex items-center gap-2" style={{ marginBottom: '2px' }}>
+                          <span className="text-[10px]" style={{ color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                            {new Date(m.timestamp || m.created_at).toLocaleString()}
+                          </span>
+                          {isWatchedFolder && sourceFileName && (
+                            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--accent-amber)', border: '1px solid var(--accent-amber)', padding: '0px 4px', lineHeight: '14px', opacity: 0.8 }}>
+                              {sourceFileName}
+                            </span>
+                          )}
+                          {sourceChannel && !isWatchedFolder && (
+                            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', padding: '0px 4px', lineHeight: '14px', opacity: 0.8 }}>
+                              {sourceChannel}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px]" style={{ color: 'var(--fg-secondary)' }}>
+                          {(m.context || m.content || '').slice(0, 200)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -75,6 +75,7 @@ export interface IdentityConfig {
   claude?: { mode: 'subscription' | 'sdk'; model?: string };
   tunnel?: { enabled: boolean };
   backup?: { enabled: boolean; remote_url: string; schedule: string; branch?: string };
+  watched_folders?: Array<{ path: string; label?: string; enabled?: boolean; extensions?: string[] }>;
 }
 
 export interface EnvConfig {

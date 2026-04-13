@@ -66,6 +66,8 @@ const api = {
       ipcRenderer.invoke(IPC.CONFIG_WRITE_ENV, env),
     saveUpload: (fileName: string, base64Data: string): Promise<{ ok: boolean; path: string }> =>
       ipcRenderer.invoke(IPC.CONFIG_SAVE_UPLOAD, fileName, base64Data),
+    selectWatchedFolder: (): Promise<string | null> =>
+      ipcRenderer.invoke('config:selectWatchedFolder'),
   },
 
   logs: {

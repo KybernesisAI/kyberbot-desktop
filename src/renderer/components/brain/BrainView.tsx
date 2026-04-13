@@ -10,7 +10,7 @@ import MemoryCanvas from './canvas/MemoryCanvas';
 import EntityBrowser from './entities/EntityBrowser';
 import type { GraphResponse, GraphNodeDTO } from './canvas/types';
 
-type BrainSubTab = 'graph' | 'entities' | 'notes' | 'timeline' | 'search';
+type BrainSubTab = 'graph' | 'entities' | 'notes' | 'timeline' | 'search' | 'sources';
 
 export default function BrainView() {
   const { serverUrl, apiToken, serverReady } = useApp();
@@ -42,7 +42,7 @@ export default function BrainView() {
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
       {/* Sub-tab bar */}
       <div className="flex items-center gap-0 px-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
-        {(['graph', 'entities', 'notes', 'timeline', 'search'] as const).map(tab => (
+        {(['graph', 'entities', 'notes', 'timeline', 'search', 'sources'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -105,6 +105,7 @@ export default function BrainView() {
         {activeTab === 'notes' && <BrainNotesView serverUrl={serverUrl} apiToken={apiToken} serverReady={serverReady} />}
         {activeTab === 'timeline' && <TimelineView serverUrl={serverUrl} apiToken={apiToken} serverReady={serverReady} />}
         {activeTab === 'search' && <SearchView serverUrl={serverUrl} apiToken={apiToken} serverReady={serverReady} />}
+        {activeTab === 'sources' && <SourcesView serverUrl={serverUrl} apiToken={apiToken} serverReady={serverReady} />}
       </div>
     </div>
   );
@@ -245,6 +246,11 @@ function TimelineView({ serverUrl, apiToken, serverReady }: { serverUrl: string;
               <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{new Date(ev.timestamp || ev.created_at).toLocaleString()}</span>
               {ev.event_type && <span style={{ fontSize: '9px', padding: '1px 6px', textTransform: 'uppercase', color: 'var(--accent-emerald)', border: '1px solid var(--accent-emerald)', fontFamily: 'var(--font-mono)', lineHeight: '14px', opacity: 0.8 }}>{ev.event_type}</span>}
               {ev.channel && <span style={{ fontSize: '9px', padding: '1px 6px', textTransform: 'uppercase', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', fontFamily: 'var(--font-mono)', lineHeight: '14px', opacity: 0.8 }}>{ev.channel}</span>}
+              {ev.source_path?.startsWith('file://watched/') && (
+                <span style={{ fontSize: '9px', padding: '1px 6px', color: 'var(--accent-amber)', border: '1px solid var(--accent-amber)', fontFamily: 'var(--font-mono)', lineHeight: '14px', opacity: 0.8 }}>
+                  {ev.source_path.split('/').pop()}
+                </span>
+              )}
               <span style={{ fontSize: '10px', color: 'var(--fg-muted)', marginLeft: 'auto' }}>{isExpanded ? '\u25BE' : '\u25B8'}</span>
             </div>
             <div style={{ fontSize: '12px', color: 'var(--fg-secondary)', whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap', overflow: isExpanded ? 'visible' : 'hidden', textOverflow: isExpanded ? 'unset' : 'ellipsis', wordBreak: isExpanded ? 'break-word' : 'normal' }}>
@@ -468,6 +474,203 @@ function GraphEntityDetail({ entity, serverUrl, apiToken, onClose, onNavigate }:
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Sources (Watched Folders) ──
+
+function SourcesView({ serverUrl, apiToken, serverReady }: { serverUrl: string; apiToken: string | null; serverReady: boolean }) {
+  const [folders, setFolders] = useState<Array<{ path: string; label?: string; enabled?: boolean; extensions?: string[] }>>([]);
+  const [status, setStatus] = useState<Array<{ path: string; label: string; enabled: boolean; fileCount: number; lastSync: string | null }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadFolders = useCallback(async () => {
+    const kb = (window as any).kyberbot;
+    if (!kb) return;
+    try {
+      const id = await kb.config.readIdentity();
+      setFolders(id?.watched_folders || []);
+    } catch {}
+
+    // Load sync status from backend
+    if (serverReady) {
+      try {
+        const data = await manageFetch<{ folders: any[] }>(serverUrl, apiToken, '/watched-folders/status');
+        setStatus(data.folders || []);
+      } catch {}
+    }
+    setLoading(false);
+  }, [serverUrl, apiToken, serverReady]);
+
+  useEffect(() => { loadFolders(); }, [loadFolders]);
+
+  const addFolder = async () => {
+    const kb = (window as any).kyberbot;
+    const path = await kb.config.selectWatchedFolder();
+    if (!path) return;
+
+    // Check for duplicates
+    if (folders.some(f => f.path === path)) return;
+
+    const updated = [...folders, { path, enabled: true }];
+    setFolders(updated);
+    await kb.config.writeIdentity({ watched_folders: updated });
+    loadFolders();
+  };
+
+  const [removeConfirm, setRemoveConfirm] = useState<{ index: number; path: string } | null>(null);
+
+  const removeFolder = async (index: number, cleanupMemories: boolean) => {
+    const kb = (window as any).kyberbot;
+    const folder = folders[index];
+    const updated = folders.filter((_, i) => i !== index);
+    setFolders(updated);
+
+    if (cleanupMemories) {
+      // Mark for cleanup — set enabled: false and add a _cleanup flag
+      // The watcher service will detect the folder removed from config and clean up
+      await kb.config.writeIdentity({ watched_folders: updated });
+    } else {
+      // Just remove from config — keep memories intact
+      await kb.config.writeIdentity({ watched_folders: updated });
+    }
+
+    setRemoveConfirm(null);
+    loadFolders();
+  };
+
+  const toggleFolder = async (index: number) => {
+    const kb = (window as any).kyberbot;
+    const updated = folders.map((f, i) => i === index ? { ...f, enabled: !f.enabled } : f);
+    setFolders(updated);
+    await kb.config.writeIdentity({ watched_folders: updated });
+  };
+
+  return (
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', padding: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <span className="section-title" style={{ color: 'var(--accent-emerald)' }}>{'// SOURCES'}</span>
+        <button
+          onClick={addFolder}
+          style={{
+            fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase',
+            background: 'var(--accent-emerald)', color: '#ffffff', border: '1px solid var(--accent-emerald)',
+            padding: '8px 12px', cursor: 'pointer',
+          }}
+        >
+          + Add Folder
+        </button>
+      </div>
+      <p style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', marginBottom: '16px' }}>
+        Watch folders on your computer. Files are automatically synced into this agent's brain.
+      </p>
+
+      {loading && <span style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>Loading...</span>}
+
+      {!loading && folders.length === 0 && (
+        <div style={{ padding: '24px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', textAlign: 'center' }}>
+          <p style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+            No folders being watched. Add a folder to sync files into this agent's brain.
+          </p>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {folders.map((folder, i) => {
+          const folderStatus = status.find(s => s.path === folder.path);
+          const isEnabled = folder.enabled !== false;
+          return (
+            <div key={folder.path} style={{
+              padding: '12px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
+              opacity: isEnabled ? 1 : 0.5, transition: 'opacity 150ms',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={isEnabled}
+                    onChange={() => toggleFolder(i)}
+                    style={{ accentColor: 'var(--accent-emerald)', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--fg-primary)', fontWeight: 500 }}>
+                    {folder.label || folder.path.split('/').pop()}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setRemoveConfirm({ index: i, path: folder.path })}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.5px', textTransform: 'uppercase',
+                    color: 'var(--status-error)', background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.6,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                >
+                  Remove
+                </button>
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--fg-muted)', marginBottom: '4px' }}>
+                {folder.path}
+              </div>
+              {folderStatus && (
+                <div style={{ display: 'flex', gap: '12px', fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--fg-muted)' }}>
+                  <span>{folderStatus.fileCount} files synced</span>
+                  {folderStatus.lastSync && (
+                    <span>Last sync: {new Date(folderStatus.lastSync).toLocaleString()}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Remove confirmation modal */}
+      {removeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ width: '100%', maxWidth: '440px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', padding: '24px' }}>
+            <span className="section-title" style={{ color: 'var(--status-error)' }}>{'// REMOVE FOLDER'}</span>
+            <p style={{ fontSize: '12px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)', marginTop: '12px', marginBottom: '6px' }}>
+              {removeConfirm.path.split('/').pop()}
+            </p>
+            <p style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', marginBottom: '20px' }}>
+              What should happen to the memories from this folder?
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                onClick={() => removeFolder(removeConfirm.index, false)}
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase',
+                  background: 'var(--accent-emerald)', color: '#ffffff', border: '1px solid var(--accent-emerald)',
+                  padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                Keep memories — just stop watching
+              </button>
+              <button
+                onClick={() => removeFolder(removeConfirm.index, true)}
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase',
+                  background: 'transparent', color: 'var(--status-error)', border: '1px solid var(--status-error)',
+                  padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                Remove memories — clean up all data from this folder
+              </button>
+              <button
+                onClick={() => setRemoveConfirm(null)}
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase',
+                  background: 'transparent', color: 'var(--fg-muted)', border: '1px solid var(--border-color)',
+                  padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

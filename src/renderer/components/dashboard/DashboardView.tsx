@@ -8,6 +8,7 @@ import { useApp } from '../../context/AppContext';
 import type { FleetStatusData, FleetAgentInfo } from '../../context/AppContext';
 import { getLogBuffer, subscribeToLogs } from '../../hooks/useLogs';
 import AnsiToHtml from 'ansi-to-html';
+import BugReportModal from './BugReportModal';
 
 
 const SERVICE_NAMES = ['ChromaDB', 'Server', 'Heartbeat', 'Sleep Agent', 'Channels', 'Tunnel'];
@@ -161,6 +162,7 @@ export default function DashboardView() {
   const kb = (window as any).kyberbot;
   const [logs, setLogs] = useState<string[]>([]);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [showBugReport, setShowBugReport] = useState(false);
   const [selectedFleetAgents, setSelectedFleetAgents] = useState<Set<string>>(new Set());
   const logContainerRef = useRef<HTMLDivElement>(null);
 
@@ -434,12 +436,20 @@ export default function DashboardView() {
             )}
           </span>
           {logsOpen && (
-            <span
-              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(logs.join('\n')); }}
-              style={{ fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', cursor: 'pointer', opacity: logs.length ? 1 : 0.3 }}
-            >
-              Copy
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span
+                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(logs.join('\n')); }}
+                style={{ fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', cursor: 'pointer', opacity: logs.length ? 1 : 0.3 }}
+              >
+                Copy
+              </span>
+              <span
+                onClick={(e) => { e.stopPropagation(); setShowBugReport(true); }}
+                style={{ fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--accent-amber)', cursor: 'pointer', border: '1px solid var(--accent-amber)', padding: '3px 8px' }}
+              >
+                Send Bug Report
+              </span>
+            </div>
           )}
         </button>
         {logsOpen && (
@@ -461,6 +471,15 @@ export default function DashboardView() {
           </div>
         )}
       </div>
+
+      {showBugReport && (
+        <BugReportModal
+          logs={logs.join('\n')}
+          appVersion="1.6.8"
+          agentName={activeAgent || 'unknown'}
+          onClose={() => setShowBugReport(false)}
+        />
+      )}
     </div>
   );
 }

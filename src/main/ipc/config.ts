@@ -69,6 +69,17 @@ export function registerConfigHandlers(store: AppStore): void {
 
     return { path: dir, hasIdentity };
   });
+
+  ipcMain.handle('config:selectWatchedFolder', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(win!, {
+      title: 'Select Folder to Watch',
+      message: 'Choose a folder to sync into this agent\'s brain',
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
   ipcMain.handle(IPC.CONFIG_GET_AGENT_ROOT, () => {
     return store.getAgentRoot();
   });
