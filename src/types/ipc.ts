@@ -27,6 +27,7 @@ export const IPC = {
   CONFIG_WRITE_IDENTITY: 'config:writeIdentity',
   CONFIG_READ_ENV: 'config:readEnv',
   CONFIG_WRITE_ENV: 'config:writeEnv',
+  CONFIG_SAVE_UPLOAD: 'config:saveUpload',
 
   // Logs (push from main)
   LOGS_LINE: 'logs:line',

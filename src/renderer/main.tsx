@@ -4,9 +4,9 @@ import App from './App';
 import { initLogSubscription } from './hooks/useLogs';
 import './styles/globals.css';
 
-// Load saved theme preference before first render
+// Load saved theme preference before first render (light is default)
 const savedTheme = localStorage.getItem('kyberbot_theme');
-if (savedTheme === 'light') {
+if (savedTheme !== 'dark') {
   document.documentElement.classList.add('light');
 }
 

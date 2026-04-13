@@ -4,6 +4,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { ArrowUp, Paperclip, X, Square } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import MemoryBlocks from './MemoryBlocks';
 import SessionList from './SessionList';
@@ -54,8 +55,11 @@ export default function ChatView() {
   const [streamTools, setStreamTools] = useState<ToolCall[]>([]);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [claudeModel, setClaudeModel] = useState('opus');
+  const [attachments, setAttachments] = useState<Array<{ name: string; dataUrl: string; preview: string }>>([]);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const authHeaders = useCallback((): Record<string, string> => {
     const h: Record<string, string> = {
@@ -156,10 +160,56 @@ export default function ChatView() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamText, streamTools]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const isImage = file.type.startsWith('image/');
+        setAttachments(prev => [...prev, {
+          name: file.name,
+          dataUrl,
+          preview: isImage ? dataUrl : '',
+        }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const removeAttachment = (index: number) => setAttachments(prev => prev.filter((_, i) => i !== index));
+
+  const autoResizeTextarea = () => {
+    const el = textareaRef.current;
+    if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; }
+  };
+
   const sendMessage = async () => {
-    if (!input.trim() || streaming) return;
-    const prompt = input.trim();
+    if ((!input.trim() && attachments.length === 0) || streaming) return;
+    let prompt = input.trim();
+
+    // Save attachments to agent uploads dir and reference paths
+    if (attachments.length > 0) {
+      const kb = (window as any).kyberbot;
+      const filePaths: string[] = [];
+      for (const att of attachments) {
+        try {
+          // Strip the data URL prefix to get raw base64
+          const base64 = att.dataUrl.replace(/^data:[^;]+;base64,/, '');
+          const result = await kb.config.saveUpload(att.name, base64);
+          if (result.ok) filePaths.push(result.path);
+        } catch {}
+      }
+      if (filePaths.length > 0) {
+        const fileRefs = filePaths.map(p => `[Attached file: ${p}]`).join('\n');
+        prompt = prompt ? `${prompt}\n\n${fileRefs}` : fileRefs;
+      }
+    }
     setInput('');
+    setAttachments([]);
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setMessages(prev => [...prev, { role: 'user', content: prompt }]);
     setStreaming(true);
     setStreamText('');
@@ -384,22 +434,90 @@ export default function ChatView() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input bar — cream to match header, framing the white chat */}
-      <div style={{ borderTop: '1px solid var(--border-color)', padding: '12px', display: 'flex', gap: '8px', background: 'var(--bg-primary)' }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-          placeholder={`Message ${agentName}...`}
-          disabled={streaming}
-          style={{ flex: 1, padding: '8px 12px', fontSize: '13px', fontFamily: 'var(--font-mono)', background: 'var(--bg-tertiary)', color: 'var(--fg-primary)', border: '1px solid var(--border-color)', outline: 'none' }}
-          autoFocus
-        />
-        {streaming ? (
-          <button onClick={() => abortRef.current?.abort()} className="px-4 py-2 text-[9px] tracking-[1px] uppercase border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--status-error)', color: 'var(--status-error)', background: 'transparent', cursor: 'pointer' }}>Stop</button>
-        ) : (
-          <button onClick={sendMessage} disabled={!input.trim()} className="px-4 py-2 text-[9px] tracking-[1px] uppercase border" style={{ fontFamily: 'var(--font-mono)', borderColor: 'var(--accent-emerald)', color: input.trim() ? '#ffffff' : 'var(--accent-emerald)', background: input.trim() ? 'var(--accent-emerald)' : 'transparent', cursor: 'pointer', opacity: input.trim() ? 1 : 0.3 }}>Send</button>
+      {/* Input bar */}
+      <div style={{ borderTop: '1px solid var(--border-color)', padding: '12px', background: 'var(--bg-primary)' }}>
+        {/* Attachment previews */}
+        {attachments.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            {attachments.map((att, i) => (
+              <div key={i} style={{
+                position: 'relative', border: '1px solid var(--border-color)',
+                overflow: 'hidden', width: 56, height: 56,
+                background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {att.preview ? (
+                  <img src={att.preview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: '8px', color: 'var(--fg-muted)', textAlign: 'center', padding: '4px', fontFamily: 'var(--font-mono)' }}>{att.name}</span>
+                )}
+                <button onClick={() => removeAttachment(i)} style={{
+                  position: 'absolute', top: 2, right: 2, width: 14, height: 14, borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.6)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
+                }}>
+                  <X size={8} color="#fff" />
+                </button>
+              </div>
+            ))}
+          </div>
         )}
+
+        {/* Textarea + buttons */}
+        <div style={{
+          display: 'flex', alignItems: 'flex-end', gap: '8px',
+          background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', padding: '8px 12px',
+        }}>
+          <input ref={fileInputRef} type="file" accept="image/*,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.js,.ts,.py,.html,.css" multiple onChange={handleFileSelect} style={{ display: 'none' }} />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={streaming}
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', padding: '4px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              opacity: streaming ? 0.3 : 0.5, transition: 'opacity var(--transition-fast)',
+            }}
+            onMouseEnter={(e) => { if (!streaming) e.currentTarget.style.opacity = '1'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = streaming ? '0.3' : '0.5'; }}
+            title="Attach image"
+          >
+            <Paperclip size={16} />
+          </button>
+
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => { setInput(e.target.value); autoResizeTextarea(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+            placeholder={`Message ${agentName}...`}
+            disabled={streaming}
+            rows={1}
+            style={{
+              flex: 1, padding: '4px 0', fontSize: '13px', fontFamily: 'var(--font-mono)',
+              background: 'transparent', color: 'var(--fg-primary)', border: 'none', outline: 'none',
+              resize: 'none', lineHeight: '1.5', maxHeight: '160px',
+            }}
+            autoFocus
+          />
+
+          {streaming ? (
+            <button onClick={() => abortRef.current?.abort()} style={{
+              width: 30, height: 30, borderRadius: '50%', background: 'var(--status-error)', border: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+            }} title="Stop">
+              <Square size={12} color="#fff" fill="#fff" />
+            </button>
+          ) : (
+            <button onClick={sendMessage} disabled={!input.trim() && attachments.length === 0} style={{
+              width: 30, height: 30, borderRadius: '50%',
+              background: (input.trim() || attachments.length > 0) ? 'var(--accent-emerald)' : 'var(--fg-muted)',
+              border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: (input.trim() || attachments.length > 0) ? 'pointer' : 'default',
+              opacity: (input.trim() || attachments.length > 0) ? 1 : 0.3, flexShrink: 0,
+              transition: 'background var(--transition-fast), opacity var(--transition-fast)',
+            }} title="Send">
+              <ArrowUp size={16} color="#fff" strokeWidth={2.5} />
+            </button>
+          )}
+        </div>
       </div>
       </div>
 

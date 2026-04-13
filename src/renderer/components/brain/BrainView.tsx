@@ -232,15 +232,19 @@ function TimelineView({ serverUrl, apiToken, serverReady }: { serverUrl: string;
         Temporal events — click to expand full content
       </p>
       {loading && <span style={{ fontSize: '12px', color: 'var(--fg-muted)' }}>Loading...</span>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {events.map((ev, i) => {
         const isExpanded = expanded.has(i);
         const content = ev.summary || ev.content || ev.title || 'No content';
         return (
-          <div key={i} onClick={() => toggle(i)} style={{ padding: '8px', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+          <div key={i} onClick={() => toggle(i)} style={{ padding: '12px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', cursor: 'pointer', transition: 'border-color 150ms' }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--border-color-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border-color)')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
               <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>{new Date(ev.timestamp || ev.created_at).toLocaleString()}</span>
-              {ev.event_type && <span style={{ fontSize: '11px', padding: '1px 4px', textTransform: 'uppercase', color: 'var(--accent-emerald)', background: 'rgba(16,185,129,0.1)', fontFamily: 'var(--font-mono)' }}>{ev.event_type}</span>}
-              {ev.channel && <span style={{ fontSize: '11px', padding: '1px 4px', textTransform: 'uppercase', color: 'var(--accent-cyan)', background: 'rgba(34,211,238,0.1)', fontFamily: 'var(--font-mono)' }}>{ev.channel}</span>}
+              {ev.event_type && <span style={{ fontSize: '9px', padding: '1px 6px', textTransform: 'uppercase', color: 'var(--accent-emerald)', border: '1px solid var(--accent-emerald)', fontFamily: 'var(--font-mono)', lineHeight: '14px', opacity: 0.8 }}>{ev.event_type}</span>}
+              {ev.channel && <span style={{ fontSize: '9px', padding: '1px 6px', textTransform: 'uppercase', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', fontFamily: 'var(--font-mono)', lineHeight: '14px', opacity: 0.8 }}>{ev.channel}</span>}
               <span style={{ fontSize: '10px', color: 'var(--fg-muted)', marginLeft: 'auto' }}>{isExpanded ? '\u25BE' : '\u25B8'}</span>
             </div>
             <div style={{ fontSize: '12px', color: 'var(--fg-secondary)', whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap', overflow: isExpanded ? 'visible' : 'hidden', textOverflow: isExpanded ? 'unset' : 'ellipsis', wordBreak: isExpanded ? 'break-word' : 'normal' }}>
@@ -249,6 +253,7 @@ function TimelineView({ serverUrl, apiToken, serverReady }: { serverUrl: string;
           </div>
         );
       })}
+      </div>
       {!loading && events.length === 0 && <span style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>No timeline events</span>}
     </div>
   );

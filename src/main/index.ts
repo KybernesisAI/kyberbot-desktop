@@ -31,8 +31,8 @@ function createWindow(): void {
   const bounds = store.getWindowBounds('main');
 
   mainWindow = new BrowserWindow({
-    width: bounds?.width ?? 1300,
-    height: bounds?.height ?? 800,
+    width: bounds?.width ?? 1400,
+    height: bounds?.height ?? 850,
     x: bounds?.x,
     y: bounds?.y,
     minWidth: 800,
@@ -40,7 +40,7 @@ function createWindow(): void {
     frame: false,
     transparent: false,
     roundedCorners: false,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#faf9f7',
     resizable: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),

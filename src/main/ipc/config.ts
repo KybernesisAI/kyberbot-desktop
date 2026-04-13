@@ -167,4 +167,19 @@ export function registerConfigHandlers(store: AppStore): void {
     writeFileSync(envPath, lines.join('\n') + '\n', 'utf-8');
     return { ok: true };
   });
+
+  // Save uploaded file to agent's uploads directory, return the file path
+  ipcMain.handle(IPC.CONFIG_SAVE_UPLOAD, (_event, fileName: string, base64Data: string) => {
+    const root = store.getAgentRoot();
+    if (!root) throw new Error('Agent root not configured');
+    const uploadsDir = join(root, 'uploads');
+    if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+    // Add timestamp to avoid collisions
+    const ts = Date.now();
+    const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = join(uploadsDir, `${ts}-${safeName}`);
+    const buffer = Buffer.from(base64Data, 'base64');
+    writeFileSync(filePath, buffer);
+    return { ok: true, path: filePath };
+  });
 }

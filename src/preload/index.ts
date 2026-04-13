@@ -64,6 +64,8 @@ const api = {
     readEnv: (): Promise<EnvConfig> => ipcRenderer.invoke(IPC.CONFIG_READ_ENV),
     writeEnv: (env: EnvConfig): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke(IPC.CONFIG_WRITE_ENV, env),
+    saveUpload: (fileName: string, base64Data: string): Promise<{ ok: boolean; path: string }> =>
+      ipcRenderer.invoke(IPC.CONFIG_SAVE_UPLOAD, fileName, base64Data),
   },
 
   logs: {

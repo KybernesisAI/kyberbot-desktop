@@ -1,11 +1,12 @@
 /**
  * KyberBot Desktop — Root App Component
+ * Sidebar-based layout.
  */
 
 import { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import TitleBar from './components/layout/TitleBar';
-import TabBar, { type TabId } from './components/layout/TabBar';
+import Sidebar, { type NavId } from './components/layout/Sidebar';
 import DashboardView from './components/dashboard/DashboardView';
 import ChatView from './components/chat/ChatView';
 import SkillsView from './components/skills/SkillsView';
@@ -17,7 +18,8 @@ import BusView from './components/bus/BusView';
 import OnboardingWizard from './components/onboarding/OnboardingWizard';
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const [activeNav, setActiveNav] = useState<NavId>('dashboard');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const { isReady, agentRoot } = useApp();
 
@@ -50,7 +52,7 @@ function AppContent() {
             Create a new agent from scratch, or open an existing agent directory.
           </p>
           <div style={{ display: 'flex', gap: '16px' }}>
-            <button onClick={() => setShowOnboarding(true)} style={{ padding: '12px 24px', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--accent-emerald)', color: 'var(--accent-emerald)', background: 'transparent', cursor: 'pointer' }}>Create New Agent</button>
+            <button onClick={() => setShowOnboarding(true)} style={{ padding: '12px 24px', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--accent-emerald)', color: '#ffffff', background: 'var(--accent-emerald)', cursor: 'pointer' }}>Create New Agent</button>
             <button onClick={async () => { const kb = (window as any).kyberbot; const result = await kb.config.selectAgentRoot(); if (result?.hasIdentity) window.location.reload(); else if (result) alert('No identity.yaml found.'); }} style={{ padding: '12px 24px', fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', border: '1px solid var(--accent-cyan)', color: 'var(--accent-cyan)', background: 'transparent', cursor: 'pointer' }}>Open Existing Agent</button>
           </div>
         </div>
@@ -61,20 +63,22 @@ function AppContent() {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-primary)' }}>
       <TitleBar />
-      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {/* Chat stays mounted always so streaming isn't interrupted by tab switches */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: activeTab === 'chat' ? 'block' : 'none' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: activeNav === 'chat' ? 'block' : 'none' }}>
           <ChatView />
         </div>
-        {/* Other tabs mount/unmount normally */}
-        {activeTab === 'dashboard' && <DashboardView />}
-        {activeTab === 'skills' && <SkillsView />}
-        {activeTab === 'channels' && <ChannelsView />}
-        {activeTab === 'heartbeat' && <HeartbeatView />}
-        {activeTab === 'brain' && <BrainView />}
-        {activeTab === 'bus' && <BusView />}
-        {activeTab === 'settings' && <SettingsView />}
+        {/* Other views mount/unmount normally */}
+        {activeNav === 'dashboard' && <DashboardView />}
+        {activeNav === 'skills' && <SkillsView />}
+        {activeNav === 'channels' && <ChannelsView />}
+        {activeNav === 'heartbeat' && <HeartbeatView />}
+        {activeNav === 'brain' && <BrainView />}
+        {activeNav === 'bus' && <BusView />}
+        {activeNav === 'settings' && <SettingsView />}
+      </main>
       </div>
     </div>
   );

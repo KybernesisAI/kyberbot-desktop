@@ -89,7 +89,7 @@ export default function SettingsView() {
 
   const inputStyle: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--bg-tertiary)', color: 'var(--fg-primary)', border: '1px solid var(--border-color)', outline: 'none', width: '100%', padding: '6px 8px' };
   const labelStyle: React.CSSProperties = { color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' };
-  const btnStyle = (color: string): React.CSSProperties => ({ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', background: color, color: '#ffffff', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.5 : 1, border: `1px solid ${color}`, padding: '4px 12px' });
+  const btnStyle = (color: string): React.CSSProperties => ({ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', background: color, color: '#ffffff', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.5 : 1, border: `1px solid ${color}`, padding: '8px 12px' });
   const sectionStyle: React.CSSProperties = { marginBottom: '20px' };
   const fieldGap: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '10px' };
 
@@ -137,34 +137,6 @@ export default function SettingsView() {
               <button onClick={() => save('Identity', () => kb.config.writeIdentity(identity))} disabled={saving} style={btnStyle('var(--accent-emerald)')}>
                 {saving ? 'Saving...' : 'Save Identity'}
               </button>
-            </div>
-          </div>
-
-          {/* Server */}
-          <div style={sectionStyle}>
-            <span className="section-title" style={{ color: 'var(--accent-cyan)' }}>{'// SERVER'}</span>
-            <div style={{ ...fieldGap, marginTop: '10px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={labelStyle}>Port</label>
-                  <input value={identity.server?.port || 3456} onChange={(e) => setIdentity({ ...identity, server: { ...identity.server, port: parseInt(e.target.value) || 3456 } })} style={inputStyle} type="number" />
-                </div>
-                <div>
-                  <label style={labelStyle}>Claude Mode</label>
-                  <select value={identity.claude?.mode || 'subscription'} onChange={(e) => setIdentity({ ...identity, claude: { ...identity.claude, mode: e.target.value as any } })} style={{ ...inputStyle, cursor: 'pointer' }}>
-                    <option value="subscription">Subscription</option>
-                    <option value="sdk">API Key (SDK)</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Claude Model</label>
-                  <select value={identity.claude?.model || 'opus'} onChange={(e) => setIdentity({ ...identity, claude: { mode: identity.claude?.mode || 'subscription', ...identity.claude, model: e.target.value } })} style={{ ...inputStyle, cursor: 'pointer' }}>
-                    <option value="opus">Opus</option>
-                    <option value="sonnet">Sonnet</option>
-                    <option value="haiku">Haiku</option>
-                  </select>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -231,6 +203,40 @@ export default function SettingsView() {
             </div>
           </div>
 
+          {/* Server */}
+          <div style={sectionStyle}>
+            <span className="section-title" style={{ color: 'var(--accent-cyan)' }}>{'// SERVER'}</span>
+            <div style={{ ...fieldGap, marginTop: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={labelStyle}>Port</label>
+                  <input value={identity.server?.port || 3456} onChange={(e) => setIdentity({ ...identity, server: { ...identity.server, port: parseInt(e.target.value) || 3456 } })} style={inputStyle} type="number" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Claude Mode</label>
+                  <select value={identity.claude?.mode || 'subscription'} onChange={(e) => setIdentity({ ...identity, claude: { ...identity.claude, mode: e.target.value as any } })} style={{ ...inputStyle, cursor: 'pointer' }}>
+                    <option value="subscription">Subscription</option>
+                    <option value="sdk">API Key (SDK)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Claude Model</label>
+                  <select value={identity.claude?.model || 'opus'} onChange={(e) => setIdentity({ ...identity, claude: { mode: identity.claude?.mode || 'subscription', ...identity.claude, model: e.target.value } })} style={{ ...inputStyle, cursor: 'pointer' }}>
+                    <option value="opus">Opus</option>
+                    <option value="sonnet">Sonnet</option>
+                    <option value="haiku">Haiku</option>
+                  </select>
+                </div>
+              </div>
+              <button onClick={() => save('Server', () => kb.config.writeIdentity(identity))} disabled={saving} style={btnStyle('var(--accent-cyan)')}>
+                {saving ? 'Saving...' : 'Save Server Config'}
+              </button>
+              <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                Restart the agent after saving for server changes to take effect.
+              </span>
+            </div>
+          </div>
+
           {/* Backup */}
           <div style={sectionStyle}>
             <span className="section-title" style={{ color: 'var(--accent-violet)' }}>{'// BACKUP'}</span>
@@ -255,17 +261,15 @@ export default function SettingsView() {
                       <input value={identity.backup?.branch || 'main'} onChange={(e) => setIdentity({ ...identity, backup: { ...identity.backup!, branch: e.target.value } })} style={inputStyle} placeholder="main" />
                     </div>
                   </div>
+                  <button onClick={() => save('Backup', () => kb.config.writeIdentity(identity))} disabled={saving} style={btnStyle('var(--accent-violet)')}>
+                    {saving ? 'Saving...' : 'Save Backup Config'}
+                  </button>
+                  <span style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+                    Restart the agent after saving for backup changes to take effect.
+                  </span>
                 </>
               )}
             </div>
-          </div>
-
-          {/* Appearance */}
-          <div style={sectionStyle}>
-            <span className="section-title" style={{ color: 'var(--fg-tertiary)' }}>{'// APPEARANCE'}</span>
-            <p style={{ fontSize: '12px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', marginTop: '10px' }}>
-              Use the moon/sun icon in the title bar to toggle dark/light mode.
-            </p>
           </div>
         </div>
       </div>

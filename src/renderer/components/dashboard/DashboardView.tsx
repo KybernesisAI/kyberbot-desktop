@@ -93,7 +93,7 @@ function FleetOverview({ fleetStatus, activeAgent, setActiveAgent, agents: regis
                   color: 'var(--fg-primary)',
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                 }}>
-                  {agent.name}
+                  {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
                 </span>
                 {isRemote && (
                   <span style={{
@@ -292,7 +292,7 @@ export default function DashboardView() {
               <div className={`status-dot ${statusDot(svc.status)}`} />
               <span className="text-[13px] font-medium" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>{svc.name}</span>
             </div>
-            <span className="text-[11px] uppercase tracking-[1px]" style={{ color: statusColor(svc.status) }}>{svc.status}</span>
+            <span className="text-[9px] uppercase tracking-[0.5px]" style={{ color: statusColor(svc.status), border: `1px solid ${statusColor(svc.status)}`, padding: '1px 6px', fontFamily: 'var(--font-mono)', lineHeight: '14px', display: 'inline-block', opacity: 0.8 }}>{svc.status}</span>
           </div>
         ))}
       </div>
@@ -373,11 +373,11 @@ export default function DashboardView() {
                         onChange={toggleSelect}
                         style={{ accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
                       />
-                      <span className="text-[12px]" style={{ fontFamily: 'var(--font-mono)', color: isSelected ? 'var(--fg-primary)' : 'var(--fg-secondary)' }}>{agent.name}</span>
+                      <span className="text-[12px]" style={{ fontFamily: 'var(--font-mono)', color: isSelected ? 'var(--fg-primary)' : 'var(--fg-secondary)' }}>{agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}</span>
                       {agent.type === 'remote' && (
                         <span style={{ fontSize: '9px', letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', padding: '1px 4px', fontFamily: 'var(--font-mono)', lineHeight: '14px' }}>REMOTE</span>
                       )}
-                      <span className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>
+                      <span className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: '200px' }}>
                         {agent.type === 'remote' ? (agent.remoteUrl || '') : (agent.root || '').replace(/^\/Users\/[^/]+\//, '~/')}
                       </span>
                     </div>
