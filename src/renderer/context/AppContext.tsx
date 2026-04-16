@@ -145,6 +145,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const fleetResult = await kb.fleet.getStatus();
         if (fleetResult.fleetMode && fleetResult.fleet) {
           setFleetStatus(fleetResult.fleet);
+          // Fleet-level APIs (orchestration, bus) only exist on the fleet port,
+          // not on per-agent port listeners. Override baseServerUrl to the fleet port.
+          setBaseServerUrl('http://localhost:3456');
         }
       } catch {}
 
@@ -252,6 +255,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // Fleet mode — status comes from fleet, not individual agents
           setFleetStatus(fleetResult.fleet);
           setCliStatus('running');
+
+          // Fleet-level APIs (orchestration, bus) only exist on the fleet port (3456),
+          // not on per-agent port listeners. Ensure baseServerUrl always points there.
+          setBaseServerUrl('http://localhost:3456');
 
           // Re-read token BEFORE marking server ready — avoids a render frame
           // where serverUrl has the /agent/ prefix but apiToken is stale (→ 401)

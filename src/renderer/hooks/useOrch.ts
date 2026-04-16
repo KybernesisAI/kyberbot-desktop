@@ -28,7 +28,9 @@ async function orchFetch<T>(serverUrl: string, token: string | null, path: strin
   const res = await fetch(`${serverUrl}/fleet/orch${path}`, { ...options, headers: { ...headers, ...(options.headers as Record<string, string> || {}) }, signal: signal || options.signal });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error((body as any).error || `HTTP ${res.status}`);
+    const msg = (body as any).error || `HTTP ${res.status}`;
+    const detail = (body as any).detail;
+    throw new Error(detail ? `${msg}: ${detail}` : msg);
   }
   return res.json();
 }
@@ -49,6 +51,7 @@ export interface UseOrchResult {
   settings: OrchSettings | null;
   loading: boolean;
   error: string | null;
+  apiUnavailable: boolean;
 
   // Issue detail
   issueComments: OrchComment[];
@@ -119,6 +122,7 @@ export function useOrch(): UseOrchResult {
   const [settings, setSettings] = useState<OrchSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [apiUnavailable, setApiUnavailable] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const abortRef = useRef<AbortController>();
 
@@ -160,10 +164,16 @@ export function useOrch(): UseOrchResult {
       if (settingsRes) setSettings(settingsRes.settings);
       if (dashRes.company) setCompany(dashRes.company);
       setError(null);
+      setApiUnavailable(false);
     } catch (err) {
       // Ignore abort errors — they are expected when a new fetch supersedes the old one
       if (err instanceof DOMException && err.name === 'AbortError') return;
-      setError((err as Error).message);
+      const msg = (err as Error).message || '';
+      // Detect orchestration API not loaded (404 = no routes, 503 = failed to load)
+      if (msg.includes('HTTP 404') || msg.includes('HTTP 503') || msg.includes('failed to load')) {
+        setApiUnavailable(true);
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -333,7 +343,7 @@ export function useOrch(): UseOrchResult {
   return {
     dashboard, issues, goals, projects, orgChart, inboxItems, inboxCount, activity,
     artifacts, runs, settings,
-    loading, error, issueComments, loadIssueComments, loadArtifactContent,
+    loading, error, apiUnavailable, issueComments, loadIssueComments, loadArtifactContent,
     createIssue, updateIssue, moveIssue, createGoal, updateGoal, deleteGoal, addComment, resolveInboxItem, dismissInboxItem, dismissAllInbox, archivedInboxItems,
     createProject, updateProject, deleteProject,
     setOrgNode, removeOrgNode, initOrchestration,

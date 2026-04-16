@@ -43,6 +43,35 @@ export default function OrchestrationView() {
     return <AgentNotRunning requires="fleet" />;
   }
 
+  // If the orchestration API is completely unavailable (failed to load on backend),
+  // show a diagnostic message instead of the misleading setup wizard.
+  if (!orch.loading && orch.apiUnavailable) {
+    return (
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px' }}>
+        <span className="section-title" style={{ color: '#ef4444', marginBottom: '16px' }}>{'// ORCHESTRATION UNAVAILABLE'}</span>
+        <p style={{ fontSize: '12px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', maxWidth: '28rem', marginBottom: '16px', lineHeight: '1.6' }}>
+          The orchestration API failed to load on the backend. This usually means the CLI needs to be rebuilt.
+        </p>
+        <div style={{ padding: '12px 16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', maxWidth: '28rem', width: '100%', marginBottom: '16px' }}>
+          <p style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', lineHeight: '1.6', margin: 0 }}>
+            Run from any agent directory:
+          </p>
+          <code style={{ fontSize: '12px', color: 'var(--accent-teal)', fontFamily: 'var(--font-mono)' }}>
+            kyberbot update
+          </code>
+          <p style={{ fontSize: '11px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', lineHeight: '1.6', margin: '8px 0 0' }}>
+            Then restart the fleet.
+          </p>
+        </div>
+        {orch.error && (
+          <p style={{ fontSize: '10px', color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', textAlign: 'center', maxWidth: '28rem' }}>
+            {orch.error}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   // Show setup wizard if no org chart exists yet
   if (!orch.loading && orch.orgChart.length === 0) {
     return <OrchSetup orch={orch} />;
