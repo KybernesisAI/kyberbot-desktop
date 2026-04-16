@@ -173,7 +173,7 @@ export default function OrchBoard({ orch, onOpenIssue }: Props) {
       )}
 
       {/* Columns — horizontal scroll with fixed-width columns */}
-      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', padding: '12px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '12px' }}>
         <div style={{ display: 'flex', gap: '10px', minWidth: 'max-content' }}>
         {KANBAN_COLUMNS.map(col => {
           const columnIssues = filtered.filter(i => i.status === col.id);
