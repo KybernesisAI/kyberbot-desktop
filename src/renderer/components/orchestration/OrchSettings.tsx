@@ -81,9 +81,13 @@ export default function OrchSettings({ orch }: Props) {
   };
 
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'auto', padding: '24px' }}>
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column' }}>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: 'var(--border-color)', minHeight: '52px' }}>
+        <span className="section-title" style={{ color: 'var(--accent-teal)' }}>{'// SETTINGS'}</span>
+      </div>
+      <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
       <div style={{ maxWidth: '520px', margin: '0 auto' }}>
-        <span className="section-title" style={{ color: 'var(--accent-teal)', marginBottom: '24px', display: 'block' }}>{'// SETTINGS'}</span>
 
         {/* Company */}
         <div style={{ marginBottom: '28px' }}>
@@ -202,6 +206,7 @@ export default function OrchSettings({ orch }: Props) {
           <ActionButton onClick={handleSave} label="Save Settings" loadingLabel="Saving" />
           {saved && <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--accent-emerald)' }}>Saved</span>}
         </div>
+      </div>
       </div>
     </div>
   );

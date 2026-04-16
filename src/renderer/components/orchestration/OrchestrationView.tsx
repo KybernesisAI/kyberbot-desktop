@@ -87,9 +87,15 @@ export default function OrchestrationView() {
         {activeTab === 'org' && <OrchOrgChart orch={orch} />}
         {activeTab === 'settings' && <OrchSettings orch={orch} />}
 
-        {/* Issue detail slide-over */}
+        {/* Issue detail slide-over with click-outside-to-close backdrop */}
         {openIssueId !== null && (
-          <OrchIssueDetail issueId={openIssueId} orch={orch} onClose={() => setOpenIssueId(null)} />
+          <>
+            <div
+              onClick={() => setOpenIssueId(null)}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9 }}
+            />
+            <OrchIssueDetail issueId={openIssueId} orch={orch} onClose={() => setOpenIssueId(null)} />
+          </>
         )}
       </div>
     </div>

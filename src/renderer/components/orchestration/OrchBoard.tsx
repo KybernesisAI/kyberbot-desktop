@@ -86,13 +86,13 @@ export default function OrchBoard({ orch, onOpenIssue }: Props) {
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column' }}>
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
+      <div className="flex items-center gap-3 px-4 py-2 border-b" style={{ borderColor: 'var(--border-color)', minHeight: '52px' }}>
         <select
           value={filterAgent}
           onChange={e => setFilterAgent(e.target.value)}
           style={{
             fontSize: '11px', fontFamily: 'var(--font-mono)', background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-color)', color: 'var(--fg-primary)', padding: '4px 8px',
+            border: '1px solid var(--border-color)', color: 'var(--fg-primary)', padding: '6px 10px',
           }}
         >
           <option value="">All agents</option>
@@ -103,7 +103,7 @@ export default function OrchBoard({ orch, onOpenIssue }: Props) {
           onChange={e => setFilterProject(e.target.value)}
           style={{
             fontSize: '11px', fontFamily: 'var(--font-mono)', background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-color)', color: 'var(--fg-primary)', padding: '4px 8px',
+            border: '1px solid var(--border-color)', color: 'var(--fg-primary)', padding: '6px 10px',
           }}
         >
           <option value="">All projects</option>
@@ -114,8 +114,8 @@ export default function OrchBoard({ orch, onOpenIssue }: Props) {
           onClick={() => setShowCreate(true)}
           style={{
             display: 'flex', alignItems: 'center', gap: '4px',
-            fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px',
-            padding: '4px 12px', background: 'var(--accent-teal)',
+            fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px',
+            padding: '8px 16px', background: 'var(--accent-teal)',
             color: '#ffffff', border: 'none', cursor: 'pointer',
           }}
         >
@@ -197,7 +197,7 @@ export default function OrchBoard({ orch, onOpenIssue }: Props) {
                 <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: col.color, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 500 }}>
                   {col.label}
                 </span>
-                <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', padding: '0 4px', background: 'var(--bg-secondary)', borderRadius: '4px' }}>
+                <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', padding: '0 4px', background: 'var(--bg-secondary)',  }}>
                   {columnIssues.length}
                 </span>
               </div>

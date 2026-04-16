@@ -44,24 +44,23 @@ export default function OrchBoardCard({ issue, onOpen, activeAgents = [], projec
       <div className="flex items-center gap-2 mt-1 flex-wrap">
         {issue.assigned_to && (
           <span style={{
-            fontSize: '9px', fontFamily: 'var(--font-mono)', padding: '1px 6px',
+            fontSize: '10px', fontFamily: 'var(--font-mono)', padding: '1px 6px', lineHeight: '14px',
             background: isAgentActive ? 'rgba(20,184,166,0.15)' : 'rgba(34,211,238,0.15)',
             color: isAgentActive ? 'var(--accent-teal)' : 'var(--accent-cyan)',
-            borderRadius: '4px',
           }}>
             {isAgentActive && '● '}{issue.assigned_to}
           </span>
         )}
         {projectName && (
           <span style={{
-            fontSize: '9px', fontFamily: 'var(--font-mono)', padding: '1px 6px',
+            fontSize: '10px', fontFamily: 'var(--font-mono)', padding: '1px 6px', lineHeight: '14px',
             background: 'rgba(255,255,255,0.05)', color: 'var(--fg-muted)',
-            border: '1px solid var(--border-color)', borderRadius: '4px',
+            border: '1px solid var(--border-color)',
           }}>
             {projectName}
           </span>
         )}
-        <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', textTransform: 'uppercase' }}>
+        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', textTransform: 'uppercase' }}>
           {issue.priority}
         </span>
       </div>

@@ -117,14 +117,14 @@ export default function OrchGoalTree({ orch }: Props) {
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column' }}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: 'var(--border-color)' }}>
+      <div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: 'var(--border-color)', minHeight: '52px' }}>
         <span className="section-title" style={{ color: 'var(--accent-teal)' }}>{'// GOALS'}</span>
         <button
           onClick={() => setShowCreate(true)}
           style={{
             display: 'flex', alignItems: 'center', gap: '4px',
-            fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px',
-            padding: '4px 12px', background: 'var(--accent-teal)',
+            fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px',
+            padding: '8px 16px', background: 'var(--accent-teal)',
             color: '#ffffff', border: 'none', cursor: 'pointer',
           }}
         >
@@ -191,8 +191,8 @@ export default function OrchGoalTree({ orch }: Props) {
               onClick={() => setShowCreate(true)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '4px',
-                fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px',
-                padding: '8px 20px', background: 'var(--accent-teal)', color: '#ffffff', border: 'none', cursor: 'pointer',
+                fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px',
+                padding: '8px 16px', background: 'var(--accent-teal)', color: '#ffffff', border: 'none', cursor: 'pointer',
               }}
             >
               <Plus size={10} /> Create First Goal

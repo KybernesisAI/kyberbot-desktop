@@ -327,13 +327,14 @@ export default function OrchOrgChart({ orch }: Props) {
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-color)' }}>
-        <div>
-          <span style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)', fontWeight: 500 }}>
+      <div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: 'var(--border-color)', minHeight: '52px' }}>
+        <div className="flex items-center gap-3">
+          <span className="section-title" style={{ color: 'var(--accent-teal)' }}>{'// ORG CHART'}</span>
+          <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>
             {company?.name || 'My Company'}
           </span>
           {company?.description && (
-            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', marginLeft: '12px' }}>
+            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>
               {company.description}
             </span>
           )}
@@ -341,8 +342,8 @@ export default function OrchOrgChart({ orch }: Props) {
         <button
           onClick={() => setEditing(true)}
           style={{
-            fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px',
-            padding: '5px 14px', background: 'transparent',
+            fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px',
+            padding: '8px 16px', background: 'transparent',
             color: 'var(--fg-muted)', border: '1px solid var(--border-color)', cursor: 'pointer',
           }}
         >
