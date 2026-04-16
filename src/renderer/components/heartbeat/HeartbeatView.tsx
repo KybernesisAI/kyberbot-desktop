@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { manageFetch } from '../../utils/api';
+import AgentNotRunning from '../shared/AgentNotRunning';
 
 interface HeartbeatTask {
   name: string;
@@ -91,6 +92,8 @@ export default function HeartbeatView() {
 
   const inputStyle = { fontFamily: 'var(--font-mono)', fontSize: '11px', background: 'var(--bg-tertiary)', color: 'var(--fg-primary)', border: '1px solid var(--border-color)', outline: 'none', width: '100%', padding: '6px 8px' };
   const labelStyle = { color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase' as const, display: 'block', marginBottom: '2px' };
+
+  if (!serverReady) return <AgentNotRunning requires="agent" />;
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
