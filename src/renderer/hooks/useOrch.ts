@@ -23,9 +23,9 @@ function buildHeaders(token: string | null): Record<string, string> {
   return headers;
 }
 
-async function orchFetch<T>(serverUrl: string, token: string | null, path: string, options: RequestInit = {}): Promise<T> {
+async function orchFetch<T>(serverUrl: string, token: string | null, path: string, options: RequestInit = {}, signal?: AbortSignal): Promise<T> {
   const headers = buildHeaders(token);
-  const res = await fetch(`${serverUrl}/fleet/orch${path}`, { ...options, headers: { ...headers, ...(options.headers as Record<string, string> || {}) } });
+  const res = await fetch(`${serverUrl}/fleet/orch${path}`, { ...options, headers: { ...headers, ...(options.headers as Record<string, string> || {}) }, signal: signal || options.signal });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
     throw new Error((body as any).error || `HTTP ${res.status}`);
@@ -115,22 +115,29 @@ export function useOrch(): UseOrchResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const abortRef = useRef<AbortController>();
 
   const fetchAll = useCallback(async () => {
     if (!serverReady || !fleetMode) return;
+
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
+
     try {
       const [dashRes, issuesRes, goalsRes, orgRes, inboxRes, allInboxRes, activityRes, agentsRes, runsRes, settingsRes, projectsRes] = await Promise.all([
-        orchFetch<OrchDashboardData>(serverUrl, apiToken, '/dashboard'),
-        orchFetch<{ issues: OrchIssue[] }>(serverUrl, apiToken, '/issues'),
-        orchFetch<{ goals: OrchGoal[] }>(serverUrl, apiToken, '/goals'),
-        orchFetch<{ nodes: OrchOrgNode[] }>(serverUrl, apiToken, '/org'),
-        orchFetch<{ items: OrchInboxItem[] }>(serverUrl, apiToken, '/inbox?status=pending'),
-        orchFetch<{ items: OrchInboxItem[] }>(serverUrl, apiToken, '/inbox').catch(() => ({ items: [] as OrchInboxItem[] })),
-        orchFetch<{ entries: OrchActivityEntry[] }>(serverUrl, apiToken, '/activity?limit=50'),
-        orchFetch<{ agents: OrchAgentIdentity[] }>(serverUrl, apiToken, '/agents'),
-        orchFetch<{ runs: OrchHeartbeatRun[] }>(serverUrl, apiToken, '/runs?limit=20').catch(() => ({ runs: [] as OrchHeartbeatRun[] })),
-        orchFetch<{ settings: OrchSettings }>(serverUrl, apiToken, '/settings').catch(() => null),
-        orchFetch<{ projects: OrchProject[] }>(serverUrl, apiToken, '/projects').catch(() => ({ projects: [] as OrchProject[] })),
+        orchFetch<OrchDashboardData>(serverUrl, apiToken, '/dashboard', {}, signal),
+        orchFetch<{ issues: OrchIssue[] }>(serverUrl, apiToken, '/issues', {}, signal),
+        orchFetch<{ goals: OrchGoal[] }>(serverUrl, apiToken, '/goals', {}, signal),
+        orchFetch<{ nodes: OrchOrgNode[] }>(serverUrl, apiToken, '/org', {}, signal),
+        orchFetch<{ items: OrchInboxItem[] }>(serverUrl, apiToken, '/inbox?status=pending', {}, signal),
+        orchFetch<{ items: OrchInboxItem[] }>(serverUrl, apiToken, '/inbox', {}, signal).catch(() => ({ items: [] as OrchInboxItem[] })),
+        orchFetch<{ entries: OrchActivityEntry[] }>(serverUrl, apiToken, '/activity?limit=50', {}, signal),
+        orchFetch<{ agents: OrchAgentIdentity[] }>(serverUrl, apiToken, '/agents', {}, signal),
+        orchFetch<{ runs: OrchHeartbeatRun[] }>(serverUrl, apiToken, '/runs?limit=20', {}, signal).catch(() => ({ runs: [] as OrchHeartbeatRun[] })),
+        orchFetch<{ settings: OrchSettings }>(serverUrl, apiToken, '/settings', {}, signal).catch(() => null),
+        orchFetch<{ projects: OrchProject[] }>(serverUrl, apiToken, '/projects', {}, signal).catch(() => ({ projects: [] as OrchProject[] })),
       ]);
       setDashboard(dashRes);
       setIssues(issuesRes.issues);
@@ -147,6 +154,8 @@ export function useOrch(): UseOrchResult {
       if (dashRes.company) setCompany(dashRes.company);
       setError(null);
     } catch (err) {
+      // Ignore abort errors — they are expected when a new fetch supersedes the old one
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       setError((err as Error).message);
     } finally {
       setLoading(false);
@@ -156,7 +165,10 @@ export function useOrch(): UseOrchResult {
   useEffect(() => {
     fetchAll();
     intervalRef.current = setInterval(fetchAll, POLL_INTERVAL);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      abortRef.current?.abort();
+    };
   }, [fetchAll]);
 
   const loadIssueComments = useCallback(async (issueId: number) => {
