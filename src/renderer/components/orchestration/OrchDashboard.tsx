@@ -4,7 +4,23 @@
 
 import { useState } from 'react';
 import type { UseOrchResult } from '../../hooks/useOrch';
-import type { OrchHeartbeatRun } from './types';
+import type { OrchHeartbeatRun, OrchActivityEntry } from './types';
+
+function formatAction(entry: OrchActivityEntry): string {
+  const id = entry.entity_id ? `KYB-${entry.entity_id}` : '';
+  const action = entry.action;
+  if (action === 'comment.added') return `Added a comment to ${id}`;
+  if (action === 'issue.created') return `Created issue ${id}`;
+  if (action === 'issue.checked_out') return `Checked out ${id}`;
+  if (action === 'issue.updated') return `Updated ${id}`;
+  if (action === 'issue.recovered') return `Recovered ${id}`;
+  if (action === 'goal.created') return `Created a goal`;
+  if (action === 'inbox.created') return `Escalated to inbox`;
+  if (action === 'inbox.resolved') return `Resolved inbox item`;
+  const transMatch = action.match(/issue\.transitioned\.(\w+)_to_(\w+)/);
+  if (transMatch) return `Moved ${id} from ${transMatch[1].replace(/_/g, ' ')} to ${transMatch[2].replace(/_/g, ' ')}`;
+  return `${action}${id ? ` ${id}` : ''}`;
+}
 import OrchRunDetail from './OrchRunDetail';
 import ActionButton from '../shared/ActionButton';
 
@@ -254,8 +270,7 @@ export default function OrchDashboard({ orch, onOpenIssue, onSwitchTab }: Props)
             {activity.slice(0, 6).map(entry => (
               <div key={entry.id} style={{ padding: '6px 10px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>
                 <span style={{ color: 'var(--accent-cyan)' }}>{entry.actor}</span>
-                {' '}{entry.action}{' '}
-                {entry.entity_id && <span style={{ color: 'var(--fg-muted)' }}>#{entry.entity_id}</span>}
+                {' '}{formatAction(entry)}
                 <span style={{ color: 'var(--fg-muted)', marginLeft: '8px', fontSize: '10px' }}>
                   {new Date(entry.created_at + 'Z').toLocaleTimeString()}
                 </span>
