@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
+import AgentNotRunning from '../shared/AgentNotRunning';
 
 interface AgentMessage {
   id: string;
@@ -125,19 +126,8 @@ export default function BusView() {
 
   const otherAgents = agents.filter(a => a.name.toLowerCase() !== activeAgent?.toLowerCase());
 
-  if (!fleetMode) {
-    return (
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
-        <div style={{ textAlign: 'center', maxWidth: 400 }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--fg-muted)', marginBottom: 8 }}>
-            Inter-agent communication requires fleet mode.
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--fg-muted)', opacity: 0.6 }}>
-            Start the fleet from the Dashboard to enable the Agent Bus.
-          </div>
-        </div>
-      </div>
-    );
+  if (!fleetMode || !serverReady) {
+    return <AgentNotRunning requires="fleet" />;
   }
 
   return (

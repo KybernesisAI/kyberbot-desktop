@@ -15,6 +15,7 @@ import HeartbeatView from './components/heartbeat/HeartbeatView';
 import SettingsView from './components/settings/SettingsView';
 import BrainView from './components/brain/BrainView';
 import BusView from './components/bus/BusView';
+import OrchestrationView from './components/orchestration/OrchestrationView';
 import OnboardingWizard from './components/onboarding/OnboardingWizard';
 
 function AppContent() {
@@ -77,6 +78,7 @@ function AppContent() {
         {activeNav === 'heartbeat' && <HeartbeatView />}
         {activeNav === 'brain' && <BrainView />}
         {activeNav === 'bus' && <BusView />}
+        {activeNav === 'orchestration' && <OrchestrationView />}
         {activeNav === 'settings' && <SettingsView />}
       </main>
       </div>

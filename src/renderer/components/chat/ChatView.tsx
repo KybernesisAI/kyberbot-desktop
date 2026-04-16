@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowUp, Paperclip, X, Square } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import AgentNotRunning from '../shared/AgentNotRunning';
 import MemoryBlocks from './MemoryBlocks';
 import SessionList from './SessionList';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -325,6 +326,10 @@ export default function ChatView() {
       abortRef.current = null;
     }
   };
+
+  if (!serverReady) {
+    return <AgentNotRunning requires="agent" />;
+  }
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex' }}>

@@ -11,6 +11,7 @@ import {
   Brain,
   Radio,
   Share2,
+  Network,
   Settings,
   Moon,
   Sun,
@@ -26,7 +27,7 @@ import {
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 
-export type NavId = 'chat' | 'dashboard' | 'heartbeat' | 'skills' | 'brain' | 'bus' | 'channels' | 'settings';
+export type NavId = 'chat' | 'dashboard' | 'heartbeat' | 'skills' | 'brain' | 'bus' | 'channels' | 'orchestration' | 'settings';
 
 const NAV_ITEMS: Array<{ id: NavId; label: string; icon: typeof MessageCircle }> = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -34,8 +35,9 @@ const NAV_ITEMS: Array<{ id: NavId; label: string; icon: typeof MessageCircle }>
   { id: 'heartbeat', label: 'Heartbeat', icon: Clock },
   { id: 'skills', label: 'Skills', icon: Sparkles },
   { id: 'brain', label: 'Brain', icon: Brain },
-  { id: 'bus', label: 'Dispatch', icon: Radio },
   { id: 'channels', label: 'Channels', icon: Share2 },
+  { id: 'bus', label: 'Dispatch', icon: Radio },
+  { id: 'orchestration', label: 'Orchestration', icon: Network },
 ];
 
 interface SidebarProps {

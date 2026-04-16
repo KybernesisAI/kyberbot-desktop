@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { manageFetch } from '../../utils/api';
+import AgentNotRunning from '../shared/AgentNotRunning';
 
 
 interface ChannelInfo { name: string; connected: boolean; verified: boolean | null; }
@@ -80,6 +81,8 @@ export default function ChannelsView() {
   };
 
   const telegramStatus = channels.find(c => c.name === 'telegram');
+
+  if (!serverReady) return <AgentNotRunning requires="agent" />;
 
   return (
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflowY: "auto", padding: 16, background: "var(--bg-primary)" }}>

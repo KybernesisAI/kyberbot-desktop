@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { brainFetch, manageFetch } from '../../utils/api';
+import AgentNotRunning from '../shared/AgentNotRunning';
 import MemoryCanvas from './canvas/MemoryCanvas';
 import EntityBrowser from './entities/EntityBrowser';
 import type { GraphResponse, GraphNodeDTO } from './canvas/types';
@@ -37,6 +38,8 @@ export default function BrainView() {
   }, [serverUrl, apiToken, serverReady]);
 
   useEffect(() => { loadGraph(); }, [loadGraph]);
+
+  if (!serverReady) return <AgentNotRunning requires="agent" />;
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
