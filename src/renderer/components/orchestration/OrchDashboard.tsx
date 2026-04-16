@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { UseOrchResult } from '../../hooks/useOrch';
 import type { OrchHeartbeatRun } from './types';
 import OrchRunDetail from './OrchRunDetail';
+import ActionButton from '../shared/ActionButton';
 
 interface Props {
   orch: UseOrchResult;
@@ -31,7 +32,6 @@ const RUN_TYPE_COLORS: Record<string, string> = {
 
 export default function OrchDashboard({ orch, onOpenIssue, onSwitchTab }: Props) {
   const { dashboard, loading, error, runs, settings, orgChart, triggerHeartbeat, updateSettings } = orch;
-  const [triggering, setTriggering] = useState(false);
   const [selectedRun, setSelectedRun] = useState<OrchHeartbeatRun | null>(null);
 
   if (loading) return <div style={{ padding: 16, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Loading...</div>;
@@ -43,21 +43,6 @@ export default function OrchDashboard({ orch, onOpenIssue, onSwitchTab }: Props)
   const ceoNode = orgChart.find(n => n.is_ceo);
   const lastRun = runs.length > 0 ? runs[0] : null;
 
-  const handleTrigger = async () => {
-    if (!ceoNode || triggering) return;
-    setTriggering(true);
-    try {
-      await triggerHeartbeat(ceoNode.agent_name);
-    } finally {
-      setTriggering(false);
-    }
-  };
-
-  const handleToggleEnabled = async () => {
-    if (!settings) return;
-    await updateSettings({ orchestration_enabled: !settings.orchestration_enabled });
-  };
-
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'auto', padding: 16 }}>
       {/* Orchestration Controls */}
@@ -65,18 +50,13 @@ export default function OrchDashboard({ orch, onOpenIssue, onSwitchTab }: Props)
         padding: '14px 16px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
         marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px',
       }}>
-        <button
-          onClick={handleTrigger}
-          disabled={triggering || !ceoNode}
-          style={{
-            fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1.5px',
-            padding: '8px 20px', background: 'var(--accent-teal)',
-            color: '#ffffff', border: 'none', cursor: triggering ? 'wait' : 'pointer',
-            opacity: triggering ? 0.5 : 1, transition: 'opacity 0.15s', flexShrink: 0,
-          }}
-        >
-          {triggering ? 'Running...' : 'Run Orchestration'}
-        </button>
+        <ActionButton
+          onClick={async () => { if (ceoNode) await triggerHeartbeat(ceoNode.agent_name); }}
+          label="Run Orchestration"
+          loadingLabel="Running"
+          disabled={!ceoNode}
+          style={{ flexShrink: 0 }}
+        />
 
         {/* Last run info */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -110,7 +90,7 @@ export default function OrchDashboard({ orch, onOpenIssue, onSwitchTab }: Props)
               Auto
             </span>
             <button
-              onClick={handleToggleEnabled}
+              onClick={() => { if (settings) updateSettings({ orchestration_enabled: !settings.orchestration_enabled }); }}
               style={{
                 width: '36px', height: '18px', borderRadius: '9px', border: 'none', cursor: 'pointer',
                 background: settings.orchestration_enabled ? 'var(--accent-teal)' : 'var(--border-color)',
@@ -177,20 +157,13 @@ export default function OrchDashboard({ orch, onOpenIssue, onSwitchTab }: Props)
                       {agentIssues.length}
                     </span>
                   )}
-                  <button
-                    onClick={async () => {
-                      try { await triggerHeartbeat(node.agent_name); } catch { /* ignore */ }
-                    }}
+                  <ActionButton
+                    onClick={() => triggerHeartbeat(node.agent_name)}
+                    label="Run"
                     disabled={isActive}
-                    style={{
-                      fontSize: '9px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px',
-                      padding: '2px 8px', background: 'transparent', color: 'var(--fg-muted)',
-                      border: '1px solid var(--border-color)', cursor: isActive ? 'default' : 'pointer',
-                      opacity: isActive ? 0.35 : 1,
-                    }}
-                  >
-                    Run
-                  </button>
+                    variant="outline"
+                    style={{ fontSize: '9px', padding: '2px 8px', letterSpacing: '1px' }}
+                  />
                 </div>
               );
             })}
