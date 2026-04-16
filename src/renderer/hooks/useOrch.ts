@@ -9,7 +9,7 @@ import { useApp } from '../context/AppContext';
 import type {
   OrchDashboardData, OrchIssue, OrchGoal, OrchComment, OrchCompany,
   OrchInboxItem, OrchActivityEntry, OrchOrgNode, OrchAgentIdentity, IssueStatus,
-  OrchHeartbeatRun, OrchSettings, OrchProject,
+  OrchHeartbeatRun, OrchSettings, OrchProject, OrchArtifact,
 } from '../components/orchestration/types';
 
 const POLL_INTERVAL = 5000;
@@ -44,6 +44,7 @@ export interface UseOrchResult {
   archivedInboxItems: OrchInboxItem[];
   inboxCount: number;
   activity: OrchActivityEntry[];
+  artifacts: OrchArtifact[];
   runs: OrchHeartbeatRun[];
   settings: OrchSettings | null;
   loading: boolean;
@@ -52,6 +53,9 @@ export interface UseOrchResult {
   // Issue detail
   issueComments: OrchComment[];
   loadIssueComments: (issueId: number) => Promise<void>;
+
+  // Artifacts
+  loadArtifactContent: (id: number) => Promise<string>;
 
   // Mutations — Issues
   createIssue: (data: Partial<OrchIssue>) => Promise<void>;
@@ -110,6 +114,7 @@ export function useOrch(): UseOrchResult {
   const [agentIdentities, setAgentIdentities] = useState<OrchAgentIdentity[]>([]);
   const [projects, setProjects] = useState<OrchProject[]>([]);
   const [company, setCompany] = useState<OrchCompany | null>(null);
+  const [artifacts, setArtifacts] = useState<OrchArtifact[]>([]);
   const [runs, setRuns] = useState<OrchHeartbeatRun[]>([]);
   const [settings, setSettings] = useState<OrchSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,7 +131,7 @@ export function useOrch(): UseOrchResult {
     const signal = abortRef.current.signal;
 
     try {
-      const [dashRes, issuesRes, goalsRes, orgRes, inboxRes, allInboxRes, activityRes, agentsRes, runsRes, settingsRes, projectsRes] = await Promise.all([
+      const [dashRes, issuesRes, goalsRes, orgRes, inboxRes, allInboxRes, activityRes, agentsRes, runsRes, settingsRes, projectsRes, artifactsRes] = await Promise.all([
         orchFetch<OrchDashboardData>(serverUrl, apiToken, '/dashboard', {}, signal),
         orchFetch<{ issues: OrchIssue[] }>(serverUrl, apiToken, '/issues', {}, signal),
         orchFetch<{ goals: OrchGoal[] }>(serverUrl, apiToken, '/goals', {}, signal),
@@ -138,6 +143,7 @@ export function useOrch(): UseOrchResult {
         orchFetch<{ runs: OrchHeartbeatRun[] }>(serverUrl, apiToken, '/runs?limit=20', {}, signal).catch(() => ({ runs: [] as OrchHeartbeatRun[] })),
         orchFetch<{ settings: OrchSettings }>(serverUrl, apiToken, '/settings', {}, signal).catch(() => null),
         orchFetch<{ projects: OrchProject[] }>(serverUrl, apiToken, '/projects', {}, signal).catch(() => ({ projects: [] as OrchProject[] })),
+        orchFetch<{ artifacts: OrchArtifact[] }>(serverUrl, apiToken, '/artifacts?limit=100', {}, signal).catch(() => ({ artifacts: [] as OrchArtifact[] })),
       ]);
       setDashboard(dashRes);
       setIssues(issuesRes.issues);
@@ -150,6 +156,7 @@ export function useOrch(): UseOrchResult {
       setAgentIdentities(agentsRes.agents);
       setRuns(runsRes.runs);
       setProjects(projectsRes.projects);
+      setArtifacts(artifactsRes.artifacts);
       if (settingsRes) setSettings(settingsRes.settings);
       if (dashRes.company) setCompany(dashRes.company);
       setError(null);
@@ -177,6 +184,12 @@ export function useOrch(): UseOrchResult {
       const data = await orchFetch<{ comments: OrchComment[] }>(serverUrl, apiToken, `/issues/${issueId}/comments`);
       setIssueComments(data.comments);
     } catch { /* ignore */ }
+  }, [serverUrl, apiToken, serverReady]);
+
+  const loadArtifactContent = useCallback(async (id: number): Promise<string> => {
+    if (!serverReady) return '';
+    const data = await orchFetch<{ content: string }>(serverUrl, apiToken, `/artifacts/${id}/content`);
+    return data.content;
   }, [serverUrl, apiToken, serverReady]);
 
   const createIssue = useCallback(async (data: Partial<OrchIssue>) => {
@@ -319,8 +332,8 @@ export function useOrch(): UseOrchResult {
 
   return {
     dashboard, issues, goals, projects, orgChart, inboxItems, inboxCount, activity,
-    runs, settings,
-    loading, error, issueComments, loadIssueComments,
+    artifacts, runs, settings,
+    loading, error, issueComments, loadIssueComments, loadArtifactContent,
     createIssue, updateIssue, moveIssue, createGoal, updateGoal, deleteGoal, addComment, resolveInboxItem, dismissInboxItem, dismissAllInbox, archivedInboxItems,
     createProject, updateProject, deleteProject,
     setOrgNode, removeOrgNode, initOrchestration,

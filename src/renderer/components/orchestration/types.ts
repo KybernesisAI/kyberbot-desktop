@@ -87,6 +87,15 @@ export interface OrchInboxItem {
   resolved_by: string | null;
 }
 
+export interface OrchArtifact {
+  id: number;
+  file_path: string;
+  description: string | null;
+  agent_name: string;
+  issue_id: number | null;
+  created_at: string;
+}
+
 export interface OrchActivityEntry {
   id: number;
   actor: string;

@@ -17,6 +17,7 @@ export function formatAction(entry: OrchActivityEntry): string {
   if (action === 'inbox.resolved') return `Resolved inbox item`;
   if (action === 'issue.recovered') return `Recovered stuck issue ${id}`;
   if (action === 'kpi.updated') return `Updated KPI`;
+  if (action === 'artifact.created') return `Created artifact`;
   if (action === 'company.updated') return `Updated company settings`;
   if (action === 'heartbeat.started') return `Started heartbeat run`;
   if (action === 'heartbeat.completed') return `Completed heartbeat run`;
