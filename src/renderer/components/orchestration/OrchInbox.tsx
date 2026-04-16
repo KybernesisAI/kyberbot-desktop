@@ -59,24 +59,9 @@ function ResolveModal({ item, orch, onClose }: { item: OrchInboxItem; orch: UseO
 }
 
 export default function OrchInbox({ orch, onOpenIssue }: Props) {
-  const { inboxItems, loading, dismissInboxItem, dismissAllInbox } = orch;
+  const { inboxItems, archivedInboxItems, loading, dismissInboxItem, dismissAllInbox } = orch;
   const [resolvingItem, setResolvingItem] = useState<OrchInboxItem | null>(null);
   const [showArchive, setShowArchive] = useState(false);
-  const [archivedItems, setArchivedItems] = useState<OrchInboxItem[]>([]);
-
-  // Fetch archived items when toggled
-  useEffect(() => {
-    if (!showArchive) return;
-    const fetchArchived = async () => {
-      try {
-        const res = await fetch(`${(orch as any).dashboard ? '' : 'http://localhost:3456'}/fleet/orch/inbox`, {
-          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
-        });
-        // Fallback: just use empty for now, the main fetch already filters
-      } catch { /* ignore */ }
-    };
-    fetchArchived();
-  }, [showArchive]);
 
   if (loading) return <div style={{ padding: 16, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Loading...</div>;
 
@@ -169,6 +154,45 @@ export default function OrchInbox({ orch, onOpenIssue }: Props) {
           </div>
         )}
       </div>
+
+      {/* Archive toggle */}
+      <div className="px-4 py-2 border-t" style={{ borderColor: 'var(--border-color)' }}>
+        <button
+          onClick={() => setShowArchive(!showArchive)}
+          style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px' }}
+        >
+          {showArchive ? '▼ Hide Archive' : '▶ Show Archive'} ({archivedInboxItems.length})
+        </button>
+      </div>
+
+      {showArchive && archivedInboxItems.length > 0 && (
+        <div style={{ overflow: 'auto', maxHeight: '300px', padding: '0 16px 16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {archivedInboxItems.map(item => (
+              <div key={item.id} style={{ padding: '8px 12px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', opacity: 0.6 }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', padding: '1px 6px', color: '#ffffff', background: item.status === 'resolved' ? '#10b981' : 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                      {item.status}
+                    </span>
+                    <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>
+                      {item.title}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>
+                    {new Date(item.created_at + 'Z').toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', marginTop: '2px' }}>
+                  from {item.source_agent}
+                  {item.resolved_by && ` · resolved by ${item.resolved_by}`}
+                  {item.resolved_at && ` · ${new Date(item.resolved_at + 'Z').toLocaleString()}`}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {resolvingItem && (
         <ResolveModal item={resolvingItem} orch={orch} onClose={() => setResolvingItem(null)} />

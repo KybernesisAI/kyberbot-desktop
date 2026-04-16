@@ -41,6 +41,7 @@ export interface UseOrchResult {
   projects: OrchProject[];
   orgChart: OrchOrgNode[];
   inboxItems: OrchInboxItem[];
+  archivedInboxItems: OrchInboxItem[];
   inboxCount: number;
   activity: OrchActivityEntry[];
   runs: OrchHeartbeatRun[];
@@ -102,6 +103,7 @@ export function useOrch(): UseOrchResult {
   const [goals, setGoals] = useState<OrchGoal[]>([]);
   const [orgChart, setOrgChart] = useState<OrchOrgNode[]>([]);
   const [inboxItems, setInboxItems] = useState<OrchInboxItem[]>([]);
+  const [archivedInboxItems, setArchivedInboxItems] = useState<OrchInboxItem[]>([]);
   const [inboxCount, setInboxCount] = useState(0);
   const [activity, setActivity] = useState<OrchActivityEntry[]>([]);
   const [issueComments, setIssueComments] = useState<OrchComment[]>([]);
@@ -117,12 +119,13 @@ export function useOrch(): UseOrchResult {
   const fetchAll = useCallback(async () => {
     if (!serverReady || !fleetMode) return;
     try {
-      const [dashRes, issuesRes, goalsRes, orgRes, inboxRes, activityRes, agentsRes, runsRes, settingsRes, projectsRes] = await Promise.all([
+      const [dashRes, issuesRes, goalsRes, orgRes, inboxRes, allInboxRes, activityRes, agentsRes, runsRes, settingsRes, projectsRes] = await Promise.all([
         orchFetch<OrchDashboardData>(serverUrl, apiToken, '/dashboard'),
         orchFetch<{ issues: OrchIssue[] }>(serverUrl, apiToken, '/issues'),
         orchFetch<{ goals: OrchGoal[] }>(serverUrl, apiToken, '/goals'),
         orchFetch<{ nodes: OrchOrgNode[] }>(serverUrl, apiToken, '/org'),
         orchFetch<{ items: OrchInboxItem[] }>(serverUrl, apiToken, '/inbox?status=pending'),
+        orchFetch<{ items: OrchInboxItem[] }>(serverUrl, apiToken, '/inbox').catch(() => ({ items: [] as OrchInboxItem[] })),
         orchFetch<{ entries: OrchActivityEntry[] }>(serverUrl, apiToken, '/activity?limit=50'),
         orchFetch<{ agents: OrchAgentIdentity[] }>(serverUrl, apiToken, '/agents'),
         orchFetch<{ runs: OrchHeartbeatRun[] }>(serverUrl, apiToken, '/runs?limit=20').catch(() => ({ runs: [] as OrchHeartbeatRun[] })),
@@ -135,6 +138,7 @@ export function useOrch(): UseOrchResult {
       setOrgChart(orgRes.nodes);
       setInboxItems(inboxRes.items);
       setInboxCount(inboxRes.items.length);
+      setArchivedInboxItems(allInboxRes.items.filter((i: OrchInboxItem) => i.status !== 'pending'));
       setActivity(activityRes.entries);
       setAgentIdentities(agentsRes.agents);
       setRuns(runsRes.runs);
@@ -305,7 +309,7 @@ export function useOrch(): UseOrchResult {
     dashboard, issues, goals, projects, orgChart, inboxItems, inboxCount, activity,
     runs, settings,
     loading, error, issueComments, loadIssueComments,
-    createIssue, updateIssue, moveIssue, createGoal, updateGoal, deleteGoal, addComment, resolveInboxItem, dismissInboxItem, dismissAllInbox,
+    createIssue, updateIssue, moveIssue, createGoal, updateGoal, deleteGoal, addComment, resolveInboxItem, dismissInboxItem, dismissAllInbox, archivedInboxItems,
     createProject, updateProject, deleteProject,
     setOrgNode, removeOrgNode, initOrchestration,
     company, updateCompany: updateCompanyFn,
