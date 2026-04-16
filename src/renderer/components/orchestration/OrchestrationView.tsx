@@ -13,11 +13,12 @@ import OrchInbox from './OrchInbox';
 import OrchActivity from './OrchActivity';
 import OrchOrgChart from './OrchOrgChart';
 import OrchProjects from './OrchProjects';
+import OrchSettings from './OrchSettings';
 import OrchIssueDetail from './OrchIssueDetail';
 import OrchSetup from './OrchSetup';
 import AgentNotRunning from '../shared/AgentNotRunning';
 
-type OrchSubTab = 'dashboard' | 'board' | 'goals' | 'projects' | 'inbox' | 'activity' | 'org';
+type OrchSubTab = 'dashboard' | 'board' | 'goals' | 'projects' | 'inbox' | 'activity' | 'org' | 'settings';
 
 const TABS: Array<{ id: OrchSubTab; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -27,6 +28,7 @@ const TABS: Array<{ id: OrchSubTab; label: string }> = [
   { id: 'inbox', label: 'Inbox' },
   { id: 'activity', label: 'Activity' },
   { id: 'org', label: 'Org Chart' },
+  { id: 'settings', label: 'Settings' },
 ];
 
 export default function OrchestrationView() {
@@ -83,6 +85,7 @@ export default function OrchestrationView() {
         {activeTab === 'inbox' && <OrchInbox orch={orch} onOpenIssue={setOpenIssueId} />}
         {activeTab === 'activity' && <OrchActivity orch={orch} />}
         {activeTab === 'org' && <OrchOrgChart orch={orch} />}
+        {activeTab === 'settings' && <OrchSettings orch={orch} />}
 
         {/* Issue detail slide-over */}
         {openIssueId !== null && (
