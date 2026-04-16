@@ -70,6 +70,8 @@ export interface UseOrchResult {
 
   // Mutations — Inbox
   resolveInboxItem: (id: number) => Promise<void>;
+  dismissInboxItem: (id: number) => Promise<void>;
+  dismissAllInbox: () => Promise<void>;
 
   // Mutations — Org chart
   setOrgNode: (agentName: string, data: { role: string; title?: string; reports_to?: string | null; is_ceo?: boolean; department?: string }) => Promise<void>;
@@ -217,6 +219,18 @@ export function useOrch(): UseOrchResult {
     await fetchAll();
   }, [serverUrl, apiToken, fetchAll]);
 
+  const dismissInboxItem = useCallback(async (id: number) => {
+    await orchFetch(serverUrl, apiToken, `/inbox/${id}/acknowledge`, { method: 'POST' });
+    await fetchAll();
+  }, [serverUrl, apiToken, fetchAll]);
+
+  const dismissAllInbox = useCallback(async () => {
+    for (const item of inboxItems) {
+      await orchFetch(serverUrl, apiToken, `/inbox/${item.id}/acknowledge`, { method: 'POST' });
+    }
+    await fetchAll();
+  }, [serverUrl, apiToken, fetchAll, inboxItems]);
+
   const setOrgNode = useCallback(async (agentName: string, data: { role: string; title?: string; reports_to?: string | null; is_ceo?: boolean; department?: string }) => {
     await orchFetch(serverUrl, apiToken, `/org/${agentName}`, { method: 'PUT', body: JSON.stringify(data) });
     await fetchAll();
@@ -291,7 +305,7 @@ export function useOrch(): UseOrchResult {
     dashboard, issues, goals, projects, orgChart, inboxItems, inboxCount, activity,
     runs, settings,
     loading, error, issueComments, loadIssueComments,
-    createIssue, updateIssue, moveIssue, createGoal, updateGoal, deleteGoal, addComment, resolveInboxItem,
+    createIssue, updateIssue, moveIssue, createGoal, updateGoal, deleteGoal, addComment, resolveInboxItem, dismissInboxItem, dismissAllInbox,
     createProject, updateProject, deleteProject,
     setOrgNode, removeOrgNode, initOrchestration,
     company, updateCompany: updateCompanyFn,
