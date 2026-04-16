@@ -4,23 +4,8 @@
 
 import { useState } from 'react';
 import type { UseOrchResult } from '../../hooks/useOrch';
-import type { OrchHeartbeatRun, OrchActivityEntry } from './types';
-
-function formatAction(entry: OrchActivityEntry): string {
-  const id = entry.entity_id ? `KYB-${entry.entity_id}` : '';
-  const action = entry.action;
-  if (action === 'comment.added') return `Added a comment to ${id}`;
-  if (action === 'issue.created') return `Created issue ${id}`;
-  if (action === 'issue.checked_out') return `Checked out ${id}`;
-  if (action === 'issue.updated') return `Updated ${id}`;
-  if (action === 'issue.recovered') return `Recovered ${id}`;
-  if (action === 'goal.created') return `Created a goal`;
-  if (action === 'inbox.created') return `Escalated to inbox`;
-  if (action === 'inbox.resolved') return `Resolved inbox item`;
-  const transMatch = action.match(/issue\.transitioned\.(\w+)_to_(\w+)/);
-  if (transMatch) return `Moved ${id} from ${transMatch[1].replace(/_/g, ' ')} to ${transMatch[2].replace(/_/g, ' ')}`;
-  return `${action}${id ? ` ${id}` : ''}`;
-}
+import type { OrchHeartbeatRun } from './types';
+import { formatAction } from './utils';
 import OrchRunDetail from './OrchRunDetail';
 import ActionButton from '../shared/ActionButton';
 
@@ -107,6 +92,9 @@ export default function OrchDashboard({ orch, onOpenIssue, onSwitchTab }: Props)
             </span>
             <button
               onClick={() => { if (settings) updateSettings({ orchestration_enabled: !settings.orchestration_enabled }); }}
+              role="switch"
+              aria-checked={settings.orchestration_enabled}
+              aria-label="Toggle auto-orchestration"
               style={{
                 width: '36px', height: '18px', borderRadius: '9px', border: 'none', cursor: 'pointer',
                 background: settings.orchestration_enabled ? 'var(--accent-teal)' : 'var(--border-color)',

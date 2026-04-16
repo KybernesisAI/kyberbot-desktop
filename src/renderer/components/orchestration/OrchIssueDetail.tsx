@@ -44,6 +44,7 @@ export default function OrchIssueDetail({ issueId, orch, onClose }: Props) {
       setEditStatus(issue.status);
       setEditing(false);
     }
+  // Intentionally depends only on issueId, not issue object (which changes every poll)
   }, [issueId]);
 
   if (!issue) return null;

@@ -4,7 +4,7 @@
  * Shows archived (acknowledged/resolved) items below.
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { UseOrchResult } from '../../hooks/useOrch';
 import type { OrchInboxItem } from './types';
 import Modal from '../shared/Modal';
@@ -97,7 +97,7 @@ export default function OrchInbox({ orch, onOpenIssue }: Props) {
                 <div key={item.id} style={{ padding: '12px 14px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
-                      <span>{urgencyIcon}</span>
+                      <span role="img" aria-label={`${item.urgency} urgency`}>{urgencyIcon}</span>
                       <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)' }}>
                         {item.title}
                       </span>

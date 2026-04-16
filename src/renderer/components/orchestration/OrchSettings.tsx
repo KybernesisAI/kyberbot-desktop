@@ -20,6 +20,7 @@ export default function OrchSettings({ orch }: Props) {
   const [compName, setCompName] = useState('');
   const [compDesc, setCompDesc] = useState('');
   const [saved, setSaved] = useState(false);
+  const [intervalError, setIntervalError] = useState('');
 
   // Sync from settings
   useEffect(() => {
@@ -41,15 +42,25 @@ export default function OrchSettings({ orch }: Props) {
   }, [company]);
 
   const handleSave = async () => {
-    await updateSettings({
-      heartbeat_interval: interval,
-      active_hours: activeHoursEnabled ? { start: startTime, end: endTime } : null,
-    });
-    if (compName !== company?.name || compDesc !== (company?.description || '')) {
-      await updateCompany({ name: compName.trim() || 'My Company', description: compDesc.trim() || undefined });
+    const isValidInterval = /^\d+[mh]$/.test(interval);
+    if (!isValidInterval) {
+      setIntervalError('Invalid interval. Use a number followed by m or h (e.g. 30m, 1h)');
+      return;
     }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setIntervalError('');
+    try {
+      await updateSettings({
+        heartbeat_interval: interval,
+        active_hours: activeHoursEnabled ? { start: startTime, end: endTime } : null,
+      });
+      if (compName !== company?.name || compDesc !== (company?.description || '')) {
+        await updateCompany({ name: compName.trim() || 'My Company', description: compDesc.trim() || undefined });
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      // Settings will show stale data on next poll refresh
+    }
   };
 
   if (loading) return <div style={{ padding: 16, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Loading...</div>;
@@ -102,6 +113,9 @@ export default function OrchSettings({ orch }: Props) {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => updateSettings({ orchestration_enabled: !settings?.orchestration_enabled })}
+                  role="switch"
+                  aria-checked={!!settings?.orchestration_enabled}
+                  aria-label="Toggle auto-orchestration"
                   style={{
                     width: '36px', height: '18px', borderRadius: '9px', border: 'none', cursor: 'pointer',
                     background: settings?.orchestration_enabled ? 'var(--accent-teal)' : 'var(--border-color)',
@@ -122,7 +136,8 @@ export default function OrchSettings({ orch }: Props) {
             </div>
             <div>
               <label style={labelStyle}>Heartbeat Interval</label>
-              <input value={interval} onChange={e => setInterval_(e.target.value)} style={{ ...inputStyle, width: '120px' }} placeholder="30m" />
+              <input value={interval} onChange={e => { setInterval_(e.target.value); setIntervalError(''); }} style={{ ...inputStyle, width: '120px', borderColor: intervalError ? '#ef4444' : undefined }} placeholder="30m" />
+              {intervalError && <p style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: '#ef4444', marginTop: '4px' }}>{intervalError}</p>}
               <p style={helpStyle}>How often the CEO agent reviews company state and takes action. Examples: 15m, 30m, 1h, 2h</p>
             </div>
             <div>
@@ -130,6 +145,9 @@ export default function OrchSettings({ orch }: Props) {
               <div className="flex items-center gap-3 mb-2">
                 <button
                   onClick={() => setActiveHoursEnabled(!activeHoursEnabled)}
+                  role="switch"
+                  aria-checked={activeHoursEnabled}
+                  aria-label="Toggle active hours"
                   style={{
                     width: '36px', height: '18px', borderRadius: '9px', border: 'none', cursor: 'pointer',
                     background: activeHoursEnabled ? 'var(--accent-teal)' : 'var(--border-color)',

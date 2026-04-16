@@ -30,7 +30,7 @@ export default function ActionButton({
     } finally {
       setLoading(false);
     }
-  }, [onClick, loading, disabled]);
+  }, [onClick, disabled]); // loading is checked inside, not a dep
 
   const isDisabled = disabled || loading;
 

@@ -54,7 +54,7 @@ export default function OrchOrgChart({ orch }: Props) {
         setActiveHoursEnd(settings.active_hours?.end || '17:00');
       }
     }
-  }, [editing]);
+  }, [editing, company, settings]);
 
   if (loading) return <div style={{ padding: 16, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Loading...</div>;
 
@@ -214,6 +214,9 @@ export default function OrchOrgChart({ orch }: Props) {
               </span>
               <button
                 onClick={() => setOrchEnabled(!orchEnabled)}
+                role="switch"
+                aria-checked={orchEnabled}
+                aria-label="Toggle orchestration"
                 style={{
                   width: '36px', height: '18px', borderRadius: '9px', border: 'none', cursor: 'pointer',
                   background: orchEnabled ? 'var(--accent-teal)' : 'var(--border-color)',
@@ -252,6 +255,9 @@ export default function OrchOrgChart({ orch }: Props) {
                   </span>
                   <button
                     onClick={() => setActiveHoursEnabled(!activeHoursEnabled)}
+                    role="switch"
+                    aria-checked={activeHoursEnabled}
+                    aria-label="Toggle active hours"
                     style={{
                       width: '36px', height: '18px', borderRadius: '9px', border: 'none', cursor: 'pointer',
                       background: activeHoursEnabled ? 'var(--accent-teal)' : 'var(--border-color)',

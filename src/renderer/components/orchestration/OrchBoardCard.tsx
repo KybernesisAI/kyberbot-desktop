@@ -24,6 +24,10 @@ export default function OrchBoardCard({ issue, onOpen, activeAgents = [], projec
         e.dataTransfer.effectAllowed = 'move';
       }}
       onClick={() => onOpen(issue.id)}
+      onKeyDown={(e) => { if (e.key === 'Enter') onOpen(issue.id); }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Issue KYB-${issue.id}: ${issue.title}`}
       style={{
         padding: '8px 10px', cursor: 'grab', background: 'var(--bg-secondary)',
         borderLeft: `3px solid ${PRIORITY_COLORS[issue.priority]}`,

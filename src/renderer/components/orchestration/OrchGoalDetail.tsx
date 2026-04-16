@@ -2,7 +2,7 @@
  * Goal Detail Modal — view and edit a goal.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { UseOrchResult } from '../../hooks/useOrch';
 import type { OrchGoal } from './types';
 import Modal from '../shared/Modal';
@@ -22,6 +22,16 @@ export default function OrchGoalDetail({ goal, orch, onClose }: Props) {
   const [owner, setOwner] = useState(goal.owner_agent || '');
   const [projectId, setProjectId] = useState(String(goal.project_id || ''));
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setTitle(goal.title);
+    setDescription(goal.description || '');
+    setStatus(goal.status);
+    setLevel(goal.level);
+    setOwner(goal.owner_agent || '');
+    setProjectId(String(goal.project_id || ''));
+    setEditing(false);
+  }, [goal.id]); // Re-sync when viewing a different goal
 
   const projectName = goal.project_id ? orch.projects.find(p => p.id === goal.project_id)?.name : null;
 

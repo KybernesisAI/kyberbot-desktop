@@ -96,7 +96,7 @@ export default function OrchBoard({ orch, onOpenIssue }: Props) {
           }}
         >
           <option value="">All agents</option>
-          {agents.map(a => <option key={a} value={a!}>{getAgentLabel(a!)} ({a})</option>)}
+          {agents.filter((a): a is string => !!a).map(a => <option key={a} value={a}>{getAgentLabel(a)} ({a})</option>)}
         </select>
         <select
           value={filterProject}
