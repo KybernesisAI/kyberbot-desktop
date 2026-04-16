@@ -70,9 +70,9 @@ export default function OrchDashboard({ orch, onOpenIssue, onSwitchTab }: Props)
           disabled={triggering || !ceoNode}
           style={{
             fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1.5px',
-            padding: '8px 20px', background: triggering ? 'var(--bg-secondary)' : 'var(--accent-teal)',
+            padding: '8px 20px', background: 'var(--accent-teal)',
             color: '#ffffff', border: 'none', cursor: triggering ? 'wait' : 'pointer',
-            opacity: triggering ? 0.7 : 1, transition: 'opacity 0.15s', flexShrink: 0,
+            opacity: triggering ? 0.5 : 1, transition: 'opacity 0.15s', flexShrink: 0,
           }}
         >
           {triggering ? 'Running...' : 'Run Orchestration'}

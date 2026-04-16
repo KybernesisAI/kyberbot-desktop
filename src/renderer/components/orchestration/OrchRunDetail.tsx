@@ -1,7 +1,10 @@
 /**
  * Orchestration Run Detail — modal showing full heartbeat run info.
+ * Polls for updates when the run is still executing.
  */
 
+import { useState, useEffect, useRef } from 'react';
+import { useApp } from '../../context/AppContext';
 import Modal from '../shared/Modal';
 import type { OrchHeartbeatRun } from './types';
 
@@ -17,7 +20,13 @@ interface ToolCall {
 }
 
 function formatDuration(start: string, end: string | null): string {
-  if (!end) return 'In progress...';
+  if (!end) {
+    // Show elapsed time for running
+    const ms = Date.now() - new Date(start + 'Z').getTime();
+    const secs = Math.floor(ms / 1000);
+    if (secs < 60) return `${secs}s elapsed`;
+    return `${Math.floor(secs / 60)}m ${secs % 60}s elapsed`;
+  }
   const ms = new Date(end + 'Z').getTime() - new Date(start + 'Z').getTime();
   if (ms < 1000) return `${ms}ms`;
   const secs = Math.floor(ms / 1000);
@@ -59,7 +68,62 @@ const valueStyle: React.CSSProperties = {
   color: 'var(--fg-primary)',
 };
 
-export default function OrchRunDetail({ run, onClose }: Props) {
+export default function OrchRunDetail({ run: initialRun, onClose }: Props) {
+  const { baseServerUrl, apiToken } = useApp();
+  const [run, setRun] = useState(initialRun);
+  const [elapsed, setElapsed] = useState('');
+  const [liveLog, setLiveLog] = useState('');
+  const logOffsetRef = useRef(0);
+  const pollRef = useRef<ReturnType<typeof setInterval>>();
+  const tickRef = useRef<ReturnType<typeof setInterval>>();
+  const logScrollRef = useRef<HTMLDivElement>(null);
+
+  const headers = { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {}) };
+
+  // Poll for run status + stream log when executing
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        // Poll run status
+        const runRes = await fetch(`${baseServerUrl}/fleet/orch/runs/${run.id}`, { headers });
+        if (runRes.ok) {
+          const data = await runRes.json();
+          if (data.run) setRun(data.run);
+        }
+
+        // Stream log with offset
+        const logRes = await fetch(`${baseServerUrl}/fleet/orch/runs/${run.id}/log?offset=${logOffsetRef.current}`, { headers });
+        if (logRes.ok) {
+          const logData = await logRes.json();
+          if (logData.content) {
+            setLiveLog(prev => prev + logData.content);
+            logOffsetRef.current = logData.totalBytes;
+            // Auto-scroll to bottom
+            if (logScrollRef.current) {
+              logScrollRef.current.scrollTop = logScrollRef.current.scrollHeight;
+            }
+          }
+        }
+      } catch { /* ignore */ }
+    };
+
+    poll(); // Initial fetch
+    pollRef.current = setInterval(poll, 2000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [run.id, baseServerUrl, apiToken]);
+
+  // Live elapsed timer for running runs
+  useEffect(() => {
+    if (run.status !== 'running') {
+      setElapsed('');
+      return;
+    }
+    const update = () => setElapsed(formatDuration(run.started_at, null));
+    update();
+    tickRef.current = setInterval(update, 1000);
+    return () => { if (tickRef.current) clearInterval(tickRef.current); };
+  }, [run.status, run.started_at]);
+
   const toolCalls = parseToolCalls(run.tool_calls_json);
 
   return (
@@ -75,35 +139,24 @@ export default function OrchRunDetail({ run, onClose }: Props) {
           <span style={{
             fontSize: '10px', fontFamily: 'var(--font-mono)',
             padding: '2px 8px', background: TYPE_COLORS[run.type] || 'var(--fg-muted)',
-            color: '#ffffff', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px',
+            color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.5px',
           }}>
             {run.type}
           </span>
         </div>
         <div>
           <span style={labelStyle}>Status</span>
-          {run.status === 'running' ? (
-            <span style={{
-              fontSize: '10px', fontFamily: 'var(--font-mono)',
-              padding: '2px 8px', background: STATUS_COLORS.running,
-              color: '#ffffff', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px',
-              animation: 'pulse-slow 1.5s ease-in-out infinite',
-            }}>
-              running
-            </span>
-          ) : (
-            <span style={{
-              fontSize: '10px', fontFamily: 'var(--font-mono)',
-              padding: '2px 8px', background: STATUS_COLORS[run.status] || 'var(--fg-muted)',
-              color: '#ffffff', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px',
-            }}>
-              {run.status}
-            </span>
-          )}
+          <span style={{
+            fontSize: '10px', fontFamily: 'var(--font-mono)',
+            padding: '2px 8px', background: STATUS_COLORS[run.status] || 'var(--fg-muted)',
+            color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.5px',
+          }}>
+            {run.status}
+          </span>
         </div>
         <div>
           <span style={labelStyle}>Duration</span>
-          <span style={valueStyle}>{formatDuration(run.started_at, run.finished_at)}</span>
+          <span style={valueStyle}>{run.status === 'running' ? elapsed : formatDuration(run.started_at, run.finished_at)}</span>
         </div>
         <div>
           <span style={labelStyle}>Started</span>
@@ -130,21 +183,6 @@ export default function OrchRunDetail({ run, onClose }: Props) {
         </div>
       )}
 
-      {/* Prompt summary */}
-      {run.prompt_summary && (
-        <div style={{ marginBottom: '20px' }}>
-          <span style={labelStyle}>Prompt Summary</span>
-          <div style={{
-            padding: '10px 12px', background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-color)',
-            fontSize: '11px', fontFamily: 'var(--font-mono)',
-            color: 'var(--fg-secondary)', whiteSpace: 'pre-wrap', lineHeight: '1.5',
-          }}>
-            {run.prompt_summary}
-          </div>
-        </div>
-      )}
-
       {/* Tool calls */}
       {toolCalls.length > 0 && (
         <div style={{ marginBottom: '20px' }}>
@@ -157,33 +195,18 @@ export default function OrchRunDetail({ run, onClose }: Props) {
               }}>
                 <div style={{
                   fontSize: '11px', fontFamily: 'var(--font-mono)',
-                  color: 'var(--accent-cyan)', fontWeight: 500, marginBottom: '6px',
+                  color: 'var(--accent-cyan)', marginBottom: '6px',
                 }}>
                   {tc.name || `tool_call_${i}`}
                 </div>
                 {tc.params && Object.keys(tc.params).length > 0 && (
-                  <div style={{ marginBottom: '6px' }}>
-                    <span style={{ ...labelStyle, fontSize: '8px' }}>Params</span>
-                    <pre style={{
-                      fontSize: '10px', fontFamily: 'var(--font-mono)',
-                      color: 'var(--fg-secondary)', margin: 0,
-                      whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-                    }}>
-                      {JSON.stringify(tc.params, null, 2)}
-                    </pre>
-                  </div>
-                )}
-                {tc.result !== undefined && tc.result !== null && (
-                  <div>
-                    <span style={{ ...labelStyle, fontSize: '8px' }}>Result</span>
-                    <pre style={{
-                      fontSize: '10px', fontFamily: 'var(--font-mono)',
-                      color: 'var(--fg-secondary)', margin: 0,
-                      whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-                    }}>
-                      {typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result, null, 2)}
-                    </pre>
-                  </div>
+                  <pre style={{
+                    fontSize: '10px', fontFamily: 'var(--font-mono)',
+                    color: 'var(--fg-secondary)', margin: 0,
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                  }}>
+                    {JSON.stringify(tc.params, null, 2)}
+                  </pre>
                 )}
               </div>
             ))}
@@ -192,39 +215,32 @@ export default function OrchRunDetail({ run, onClose }: Props) {
       )}
 
       {/* Session Log */}
-      {run.status === 'running' && (
-        <div style={{ marginBottom: '20px' }}>
-          <span style={labelStyle}>Session Log</span>
-          <div style={{
+      <div style={{ marginBottom: '20px' }}>
+        <span style={labelStyle}>
+          Session Log
+          {run.status === 'running' && <span style={{ color: 'var(--accent-cyan)', marginLeft: '8px' }}>LIVE</span>}
+        </span>
+        <div
+          ref={logScrollRef}
+          style={{
             marginTop: '8px', padding: '12px', background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-color)',
-            fontSize: '11px', fontFamily: 'var(--font-mono)',
-            color: 'var(--fg-muted)', fontStyle: 'italic',
-          }}>
-            Agent is currently executing...
-          </div>
+            border: `1px solid ${run.status === 'running' ? 'var(--accent-cyan)' : 'var(--border-color)'}`,
+            maxHeight: '400px', overflowY: 'auto',
+            fontFamily: 'var(--font-mono)', fontSize: '11px',
+            color: 'var(--fg-secondary)', lineHeight: '1.5',
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          }}
+        >
+          {liveLog || run.log_output || (run.status === 'running' ? 'Waiting for output...' : 'No log output captured.')}
         </div>
-      )}
-      {run.log_output && (
-        <div style={{ marginBottom: '20px' }}>
-          <span style={labelStyle}>Session Log</span>
-          <div style={{
-            marginTop: '8px', padding: '12px', background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-color)', maxHeight: '400px', overflowY: 'auto',
-            fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--fg-secondary)',
-            lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          }}>
-            {run.log_output}
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Error */}
       {run.error && (
         <div>
           <span style={labelStyle}>Error</span>
           <div style={{
-            padding: '10px 12px', background: 'rgba(239, 68, 68, 0.1)',
+            padding: '10px 12px', background: 'rgba(239,68,68,0.1)',
             border: '1px solid #ef4444',
             fontSize: '11px', fontFamily: 'var(--font-mono)',
             color: '#ef4444', whiteSpace: 'pre-wrap', lineHeight: '1.5',
