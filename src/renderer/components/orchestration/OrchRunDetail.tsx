@@ -82,13 +82,24 @@ export default function OrchRunDetail({ run, onClose }: Props) {
         </div>
         <div>
           <span style={labelStyle}>Status</span>
-          <span style={{
-            fontSize: '10px', fontFamily: 'var(--font-mono)',
-            padding: '2px 8px', background: STATUS_COLORS[run.status] || 'var(--fg-muted)',
-            color: '#ffffff', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px',
-          }}>
-            {run.status}
-          </span>
+          {run.status === 'running' ? (
+            <span style={{
+              fontSize: '10px', fontFamily: 'var(--font-mono)',
+              padding: '2px 8px', background: STATUS_COLORS.running,
+              color: '#ffffff', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px',
+              animation: 'pulse-slow 1.5s ease-in-out infinite',
+            }}>
+              running
+            </span>
+          ) : (
+            <span style={{
+              fontSize: '10px', fontFamily: 'var(--font-mono)',
+              padding: '2px 8px', background: STATUS_COLORS[run.status] || 'var(--fg-muted)',
+              color: '#ffffff', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px',
+            }}>
+              {run.status}
+            </span>
+          )}
         </div>
         <div>
           <span style={labelStyle}>Duration</span>
@@ -176,6 +187,34 @@ export default function OrchRunDetail({ run, onClose }: Props) {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Session Log */}
+      {run.status === 'running' && (
+        <div style={{ marginBottom: '20px' }}>
+          <span style={labelStyle}>Session Log</span>
+          <div style={{
+            marginTop: '8px', padding: '12px', background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-color)',
+            fontSize: '11px', fontFamily: 'var(--font-mono)',
+            color: 'var(--fg-muted)', fontStyle: 'italic',
+          }}>
+            Agent is currently executing...
+          </div>
+        </div>
+      )}
+      {run.log_output && (
+        <div style={{ marginBottom: '20px' }}>
+          <span style={labelStyle}>Session Log</span>
+          <div style={{
+            marginTop: '8px', padding: '12px', background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-color)', maxHeight: '400px', overflowY: 'auto',
+            fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--fg-secondary)',
+            lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          }}>
+            {run.log_output}
           </div>
         </div>
       )}
