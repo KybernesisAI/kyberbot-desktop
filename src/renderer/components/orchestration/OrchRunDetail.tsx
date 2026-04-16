@@ -46,6 +46,65 @@ function parseToolCalls(json: string | null): ToolCall[] {
   }
 }
 
+/**
+ * Parse JSONL stream-json output into readable transcript entries.
+ */
+function parseStreamLog(raw: string): string {
+  if (!raw) return '';
+  const lines = raw.split('\n').filter(l => l.trim());
+  const parts: string[] = [];
+
+  for (const line of lines) {
+    try {
+      const event = JSON.parse(line.trim());
+
+      if (event.type === 'system' && event.subtype === 'init') {
+        parts.push(`[INIT] cwd: ${event.cwd} | model: ${event.model} | mode: ${event.permissionMode}`);
+      } else if (event.type === 'system' && event.subtype === 'hook_started') {
+        // Skip hook noise
+      } else if (event.type === 'system' && event.subtype === 'hook_response') {
+        // Skip hook noise
+      } else if (event.type === 'assistant') {
+        const msg = event.message;
+        if (msg?.content) {
+          for (const block of msg.content) {
+            if (block.type === 'thinking') {
+              // Show first 500 chars of thinking
+              const thinking = block.thinking || '';
+              parts.push(`[THINKING] ${thinking.slice(0, 500)}${thinking.length > 500 ? '...' : ''}`);
+            } else if (block.type === 'text') {
+              parts.push(`[OUTPUT] ${block.text}`);
+            } else if (block.type === 'tool_use') {
+              const params = block.input ? JSON.stringify(block.input).slice(0, 200) : '';
+              parts.push(`[TOOL] ${block.name}(${params}${params.length >= 200 ? '...' : ''})`);
+            }
+          }
+        }
+      } else if (event.type === 'tool_result' || event.type === 'user') {
+        const msg = event.message;
+        if (msg?.content) {
+          for (const block of msg.content) {
+            if (block.type === 'tool_result') {
+              const content = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
+              parts.push(`[RESULT] ${(content || '').slice(0, 300)}${(content || '').length > 300 ? '...' : ''}`);
+            }
+          }
+        }
+      } else if (event.type === 'result') {
+        parts.push(`[DONE] ${event.subtype || 'success'} | ${event.num_turns || 0} turns | ${event.duration_ms ? Math.round(event.duration_ms / 1000) + 's' : ''} | cost: $${event.total_cost_usd?.toFixed(4) || '?'}`);
+        if (event.result) {
+          parts.push(`[FINAL] ${event.result.slice(0, 500)}`);
+        }
+      }
+    } catch {
+      // Not valid JSON — show raw line
+      if (line.trim()) parts.push(line.trim());
+    }
+  }
+
+  return parts.join('\n');
+}
+
 const STATUS_COLORS: Record<string, string> = {
   completed: '#10b981',
   failed: '#ef4444',
@@ -231,7 +290,7 @@ export default function OrchRunDetail({ run: initialRun, onClose }: Props) {
             whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           }}
         >
-          {liveLog || run.log_output || (run.status === 'running' ? 'Waiting for output...' : 'No log output captured.')}
+          {parseStreamLog(liveLog || run.log_output || '') || (run.status === 'running' ? 'Waiting for output...' : 'No log output captured.')}
         </div>
       </div>
 
