@@ -386,11 +386,16 @@ export class LifecycleManager extends EventEmitter {
       }
     });
 
+    let nativeModuleMismatch = false;
     agent.process.stderr?.on('data', (data: Buffer) => {
-      const lines = data.toString().split('\n').filter(Boolean);
+      const text = data.toString();
+      const lines = text.split('\n').filter(Boolean);
       for (const line of lines) {
         this.emit('log-line', root, `[stderr] ${line}`);
         agent.logStream?.write(`[stderr] ${line}\n`);
+      }
+      if (text.includes('NODE_MODULE_VERSION')) {
+        nativeModuleMismatch = true;
       }
     });
 
@@ -407,6 +412,20 @@ export class LifecycleManager extends EventEmitter {
       if (agent.status === 'stopping') {
         agent.status = 'stopped';
         this.emitAgentStatus(root);
+        return;
+      }
+
+      // Auto-rebuild better-sqlite3 when Node version changes
+      if (nativeModuleMismatch) {
+        agent.status = 'crashed';
+        this.emitAgentStatus(root);
+        this.rebuildNativeModules().then((ok) => {
+          if (ok && agent.restartCount < this.MAX_RESTARTS) {
+            agent.restartCount++;
+            console.log('[lifecycle] Rebuilt native modules, restarting agent...');
+            setTimeout(() => this.spawnAgentProcess(root, port), 2_000);
+          }
+        });
         return;
       }
 
@@ -510,10 +529,15 @@ export class LifecycleManager extends EventEmitter {
       }
     });
 
+    let fleetNativeMismatch = false;
     this.fleetProcess.stderr?.on('data', (data: Buffer) => {
-      for (const line of data.toString().split('\n').filter(Boolean)) {
+      const text = data.toString();
+      for (const line of text.split('\n').filter(Boolean)) {
         this.emit('log-line', '__fleet__', `[stderr] ${line}`);
         this.fleetLogStream?.write(`[stderr] ${line}\n`);
+      }
+      if (text.includes('NODE_MODULE_VERSION')) {
+        fleetNativeMismatch = true;
       }
     });
 
@@ -523,6 +547,19 @@ export class LifecycleManager extends EventEmitter {
       this.fleetLogStream = null;
       this._fleetMode = false;
       this.lastFleetStatus = null;
+
+      // Auto-rebuild better-sqlite3 when Node version changes
+      if (fleetNativeMismatch) {
+        this.emit('status-change', 'stopped', null);
+        this.rebuildNativeModules().then((ok) => {
+          if (ok) {
+            console.log('[lifecycle] Rebuilt native modules, restarting fleet...');
+            setTimeout(() => this.spawnFleetProcess(agents), 2_000);
+          }
+        });
+        return;
+      }
+
       this.emit('status-change', 'stopped', null);
     });
 
@@ -652,6 +689,35 @@ exec "$NODE" "$CLI_ENTRY" "$@"
         console.log('[lifecycle] CLI wrapper fixed');
       }
     } catch { /* non-fatal */ }
+  }
+
+  /**
+   * Rebuild better-sqlite3 for the current Node version.
+   * Called automatically when NODE_MODULE_VERSION mismatch is detected.
+   */
+  private async rebuildNativeModules(): Promise<boolean> {
+    const home = require('os').homedir();
+    const sourceDir = join(home, '.kyberbot', 'source');
+    if (!existsSync(sourceDir)) return false;
+
+    console.log('[lifecycle] NODE_MODULE_VERSION mismatch detected — rebuilding better-sqlite3...');
+    this.emit('log-line', '__fleet__', '[lifecycle] Rebuilding better-sqlite3 for current Node version...');
+
+    try {
+      const { execSync } = require('child_process');
+      execSync('pnpm rebuild better-sqlite3', {
+        cwd: sourceDir,
+        stdio: 'pipe',
+        timeout: 60_000,
+      });
+      console.log('[lifecycle] better-sqlite3 rebuilt successfully');
+      this.emit('log-line', '__fleet__', '[lifecycle] better-sqlite3 rebuilt successfully');
+      return true;
+    } catch (err: any) {
+      console.error('[lifecycle] Failed to rebuild better-sqlite3:', err.message);
+      this.emit('log-line', '__fleet__', `[lifecycle] Failed to rebuild: ${err.message}`);
+      return false;
+    }
   }
 
   private resolveCliDirect(): { node: string; entry: string } | null {
