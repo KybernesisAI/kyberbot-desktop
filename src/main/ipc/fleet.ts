@@ -38,6 +38,7 @@ interface AgentInfo {
   type: 'local' | 'remote';
   remoteUrl?: string;
   remoteToken?: string;
+  missing?: boolean;
 }
 
 // ── Helpers ──
@@ -141,28 +142,31 @@ export function registerFleetHandlers(
         continue;
       }
 
-      // Local agent
-      const identity = readIdentityFromRoot(entry.root);
+      // Local agent — check if the directory still exists
+      const rootExists = existsSync(entry.root) && existsSync(join(entry.root, 'identity.yaml'));
+      const identity = rootExists ? readIdentityFromRoot(entry.root) : { agent_name: name, port: 3456, agent_description: '' };
 
       let running = false;
-      if (isFleetMode && lifecycleRunning) {
-        // Fleet mode: all agents managed by fleet are running — probe to confirm
-        running = await probeHealth(identity.port);
-      } else if (lifecycleRunning && currentAgentRoot === entry.root) {
-        // Single-agent mode: only the current agent root is running
-        running = true;
+      if (rootExists) {
+        if (isFleetMode && lifecycleRunning) {
+          // Fleet mode: all agents managed by fleet are running — probe to confirm
+          running = await probeHealth(identity.port);
+        } else if (lifecycleRunning && currentAgentRoot === entry.root) {
+          // Single-agent mode: only the current agent root is running
+          running = true;
+        }
       }
-      // Otherwise: agent is not running (don't health-probe other agents on same port)
 
       results.push({
-        name: identity.agent_name,
+        name,  // Always use registry key — not identity.agent_name which becomes "unknown" for missing dirs
         root: entry.root,
         port: identity.port,
-        description: identity.agent_description,
+        description: rootExists ? identity.agent_description : '',
         registered: entry.registered,
         running,
         type: 'local',
-      });
+        missing: !rootExists,
+      } as AgentInfo);
     }
 
     return results;

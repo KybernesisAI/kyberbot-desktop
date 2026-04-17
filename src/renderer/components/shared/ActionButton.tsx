@@ -60,7 +60,7 @@ export default function ActionButton({
 
   return (
     <button onClick={handleClick} disabled={isDisabled} style={baseStyle}>
-      {loading && <BrailleSpinner color={variant === 'primary' ? '#ffffff' : color} />}
+      {loading && <span style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0, position: 'relative', top: '-2px' }}><BrailleSpinner color={variant === 'primary' ? '#ffffff' : color} /></span>}
       {loading ? (loadingLabel || label) : label}
     </button>
   );

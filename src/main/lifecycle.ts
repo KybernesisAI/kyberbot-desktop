@@ -255,20 +255,36 @@ export class LifecycleManager extends EventEmitter {
   async startFleet(agents: string[]): Promise<void> {
     if (this.fleetProcess) return;
 
-    this._fleetMode = true;
-    this._fleetAgents = agents;
-
+    // Check if a fleet is already running externally (e.g. started from CLI)
     const port = 3456;
     try {
       const res = await fetch(`http://localhost:${port}/fleet`, { signal: AbortSignal.timeout(2000) });
       if (res.ok) {
-        this.lastFleetStatus = await res.json() as FleetStatus;
-        this.emit('status-change', 'running', '__fleet__');
-        this.startFleetHealthPolling();
-        return;
+        const data = await res.json() as FleetStatus;
+        if (data.mode === 'fleet' && data.agents?.length > 0) {
+          this._fleetMode = true;
+          this._fleetAgents = agents;
+          this.lastFleetStatus = data;
+          this.emit('status-change', 'running', '__fleet__');
+          this.startFleetHealthPolling();
+          return;
+        }
       }
     } catch { /* not running */ }
 
+    // Stop any running single agents first — they hold the port
+    for (const root of this.agents.keys()) {
+      const agent = this.agents.get(root);
+      if (agent && (agent.status === 'running' || agent.status === 'starting' || agent.attached)) {
+        console.log(`[lifecycle] Stopping single agent before fleet start: ${root}`);
+        await this.stopAgent(root);
+      }
+    }
+    // Wait for port to be released
+    await new Promise(r => setTimeout(r, 1000));
+
+    this._fleetMode = true;
+    this._fleetAgents = agents;
     this.spawnFleetProcess(agents);
   }
 

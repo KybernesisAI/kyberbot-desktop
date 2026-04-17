@@ -18,6 +18,7 @@ export interface FleetAgentInfo {
   type?: 'local' | 'remote';
   remoteUrl?: string;
   remoteToken?: string;
+  missing?: boolean;
 }
 
 export interface FleetStatusData {

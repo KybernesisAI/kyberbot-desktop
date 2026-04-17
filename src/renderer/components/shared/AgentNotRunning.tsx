@@ -4,8 +4,8 @@
  */
 
 import { Bot } from 'lucide-react';
-import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import ActionButton from './ActionButton';
 
 interface Props {
   /** 'agent' for views that work with a single agent, 'fleet' for views that need fleet mode */
@@ -13,33 +13,11 @@ interface Props {
 }
 
 export default function AgentNotRunning({ requires }: Props) {
-  const { activeAgent, agents, fleetMode } = useApp();
-  const [starting, setStarting] = useState(false);
+  const { activeAgent, agents } = useApp();
   const kb = (window as any).kyberbot;
 
-  const handleStartAgent = async () => {
-    if (starting) return;
-    setStarting(true);
-    try {
-      await kb?.services.start();
-    } catch { /* ignore */ }
-    finally { setStarting(false); }
-  };
-
-  const handleStartFleet = async () => {
-    if (starting) return;
-    setStarting(true);
-    try {
-      const agentNames = agents.map(a => a.name);
-      if (agentNames.length > 0) {
-        await kb?.fleet.start(agentNames);
-      }
-    } catch { /* ignore */ }
-    finally { setStarting(false); }
-  };
-
   const isFleetRequired = requires === 'fleet';
-  const hasMultipleAgents = agents.length >= 2;
+  const hasMultipleAgents = agents.filter(a => !a.missing).length >= 2;
 
   return (
     <div style={{
@@ -67,36 +45,33 @@ export default function AgentNotRunning({ requires }: Props) {
 
       {isFleetRequired ? (
         hasMultipleAgents ? (
-          <button
-            onClick={handleStartFleet}
-            disabled={starting}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '2px',
-              padding: '10px 24px', cursor: starting ? 'wait' : 'pointer',
-              background: 'var(--accent-cyan)', color: '#ffffff', border: 'none',
+          <ActionButton
+            onClick={async () => {
+              const agentNames = agents.filter(a => !a.missing).map(a => a.name);
+              if (agentNames.length > 0) await kb?.fleet.start(agentNames);
+              await new Promise(r => setTimeout(r, 3000));
             }}
-          >
-            {starting ? 'Starting...' : 'Start Fleet'}
-          </button>
+            label="Start Fleet"
+            loadingLabel="Starting Fleet..."
+            color="var(--accent-cyan)"
+            style={{ fontSize: '11px', letterSpacing: '2px', padding: '10px 24px' }}
+          />
         ) : (
           <p style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', textAlign: 'center' }}>
             Register at least two agents from the Dashboard to use fleet mode.
           </p>
         )
       ) : (
-        <button
-          onClick={handleStartAgent}
-          disabled={starting}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '2px',
-            padding: '10px 24px', cursor: starting ? 'wait' : 'pointer',
-            background: 'var(--accent-emerald)', color: '#ffffff', border: 'none',
+        <ActionButton
+          onClick={async () => {
+            await kb?.services.start();
+            await new Promise(r => setTimeout(r, 3000));
           }}
-        >
-          {starting ? 'Starting...' : `Start ${activeAgent || 'Agent'}`}
-        </button>
+          label={`Start ${activeAgent || 'Agent'}`}
+          loadingLabel="Starting..."
+          color="var(--accent-emerald)"
+          style={{ fontSize: '11px', letterSpacing: '2px', padding: '10px 24px' }}
+        />
       )}
     </div>
   );

@@ -9,6 +9,7 @@ import type { FleetStatusData, FleetAgentInfo } from '../../context/AppContext';
 import { getLogBuffer, subscribeToLogs } from '../../hooks/useLogs';
 import AnsiToHtml from 'ansi-to-html';
 import BugReportModal from './BugReportModal';
+import ActionButton from '../shared/ActionButton';
 
 
 const SERVICE_NAMES = ['ChromaDB', 'Server', 'Heartbeat', 'Sleep Agent', 'Channels', 'Tunnel'];
@@ -176,10 +177,10 @@ export default function DashboardView() {
   const services = health?.services ?? SERVICE_NAMES.map(name => ({ name, status: isRunning ? 'unknown' : 'stopped' }));
   const ansiConverter = useMemo(() => new AnsiToHtml({ fg: '#a1a1aa', bg: 'transparent', newline: false, escapeXML: true }), []);
 
-  // Initialize fleet agent selection — all selected by default
+  // Initialize fleet agent selection — all non-missing agents selected by default
   useEffect(() => {
     if (agents.length > 0 && selectedFleetAgents.size === 0) {
-      setSelectedFleetAgents(new Set(agents.map(a => a.name)));
+      setSelectedFleetAgents(new Set(agents.filter(a => !a.missing).map(a => a.name)));
     }
   }, [agents]);
 
@@ -243,44 +244,33 @@ export default function DashboardView() {
           {/* Start/Stop — hidden for remote agents */}
           {!isRemoteAgent && (
             <>
-              <button
+              <ActionButton
                 onClick={async () => {
                   await kb?.services.start();
+                  // Wait for status to change — IPC returns before the agent is up
+                  await new Promise(r => setTimeout(r, 3000));
                 }}
+                label={`Start ${activeAgent || 'Agent'}`}
+                loadingLabel="Starting..."
                 disabled={isRunning || isStarting || isStopping}
-                className="px-4 py-2 text-[11px] tracking-[1px] uppercase border transition-colors"
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  borderColor: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : 'var(--accent-emerald)',
-                  color: isRunning || isStarting || isStopping ? 'var(--fg-muted)' : '#ffffff',
-                  background: isRunning || isStarting || isStopping ? 'transparent' : 'var(--accent-emerald)',
-                  cursor: isRunning || isStarting || isStopping ? 'default' : 'pointer',
-                  opacity: isRunning || isStarting || isStopping ? 0.3 : 1,
-                }}
-              >
-                {`Start ${activeAgent || 'Agent'}`}
-              </button>
-              <button
+                color="var(--accent-emerald)"
+                style={{ fontSize: '11px', letterSpacing: '1px', padding: '8px 16px', border: '1px solid var(--accent-emerald)' }}
+              />
+              <ActionButton
                 onClick={async () => {
                   if (fleetMode && fleetStatus) {
                     await kb?.fleet.stop();
                   } else {
                     await kb?.services.stop();
                   }
+                  await new Promise(r => setTimeout(r, 2000));
                 }}
+                label={fleetMode && fleetStatus ? 'Stop Fleet' : `Stop ${activeAgent || 'Agent'}`}
+                loadingLabel="Stopping..."
                 disabled={!isRunning || isStopping}
-                className="px-4 py-2 text-[11px] tracking-[1px] uppercase border transition-colors"
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  borderColor: isRunning && !isStopping ? 'var(--status-error)' : 'var(--fg-muted)',
-                  color: isRunning && !isStopping ? 'var(--status-error)' : 'var(--fg-muted)',
-                  background: 'transparent',
-                  cursor: isRunning && !isStopping ? 'pointer' : 'default',
-                  opacity: isRunning && !isStopping ? 1 : 0.3,
-                }}
-              >
-                {isStopping ? 'Stopping...' : (fleetMode && fleetStatus ? 'Stop Fleet' : `Stop ${activeAgent || 'Agent'}`)}
-              </button>
+                variant="danger"
+                style={{ fontSize: '11px', letterSpacing: '1px', padding: '8px 16px', border: '1px solid var(--border-color)' }}
+              />
             </>
           )}
         </div>
@@ -329,35 +319,30 @@ export default function DashboardView() {
               <span className="text-[11px] tracking-[1px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>
                 {selectedFleetAgents.size}/{agents.length} selected
               </span>
-              {agents.length >= 2 && !isStarting && (
-                <button
+              {agents.filter(a => !a.missing).length >= 2 && !isStarting && (
+                <ActionButton
                   onClick={async () => {
                     const selected = [...selectedFleetAgents];
-                    if (selected.length > 0) {
-                      await kb?.fleet.start(selected);
-                    }
+                    if (selected.length < 2) return;
+                    await kb?.fleet.start(selected);
+                    await new Promise(r => setTimeout(r, 3000));
                   }}
-                  disabled={isRunning || isStarting || isStopping || selectedFleetAgents.size === 0}
-                  className="px-4 py-2 text-[11px] tracking-[1px] uppercase border transition-colors"
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    borderColor: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'var(--fg-muted)' : 'var(--accent-cyan)',
-                    color: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'var(--fg-muted)' : '#ffffff',
-                    background: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'transparent' : 'var(--accent-cyan)',
-                    cursor: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 'default' : 'pointer',
-                    opacity: isRunning || isStarting || isStopping || selectedFleetAgents.size === 0 ? 0.3 : 1,
-                  }}
-                >
-                  Start Fleet ({selectedFleetAgents.size})
-                </button>
+                  label={`Start Fleet (${selectedFleetAgents.size})`}
+                  loadingLabel="Starting Fleet..."
+                  disabled={isRunning || isStarting || isStopping || selectedFleetAgents.size < 2}
+                  color="var(--accent-cyan)"
+                  style={{ fontSize: '11px', letterSpacing: '1px', padding: '8px 16px', border: '1px solid var(--accent-cyan)' }}
+                />
               )}
             </div>
           </div>
 
           <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
             {agents.map((agent: any) => {
-              const isSelected = selectedFleetAgents.has(agent.name);
+              const isMissing = agent.missing;
+              const isSelected = !isMissing && selectedFleetAgents.has(agent.name);
               const toggleSelect = () => {
+                if (isMissing) return;
                 setSelectedFleetAgents(prev => {
                   const next = new Set(prev);
                   if (next.has(agent.name)) next.delete(agent.name);
@@ -366,16 +351,20 @@ export default function DashboardView() {
                 });
               };
               return (
-                <div key={agent.name} className="p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+                <div key={agent.name} className="p-3 border" style={{ background: 'var(--bg-secondary)', borderColor: isMissing ? 'var(--status-error)' : 'var(--border-color)', opacity: isMissing ? 0.6 : 1 }}>
                   <div className="flex items-center justify-between">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={toggleSelect}
-                        style={{ accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
+                        disabled={isMissing}
+                        style={{ accentColor: 'var(--accent-cyan)', cursor: isMissing ? 'default' : 'pointer' }}
                       />
-                      <span className="text-[12px]" style={{ fontFamily: 'var(--font-mono)', color: isSelected ? 'var(--fg-primary)' : 'var(--fg-secondary)' }}>{agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}</span>
+                      <span className="text-[12px]" style={{ fontFamily: 'var(--font-mono)', color: isMissing ? 'var(--status-error)' : isSelected ? 'var(--fg-primary)' : 'var(--fg-secondary)' }}>{agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}</span>
+                      {isMissing && (
+                        <span style={{ fontSize: '9px', letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--status-error)', border: '1px solid var(--status-error)', padding: '1px 4px', fontFamily: 'var(--font-mono)', lineHeight: '14px' }}>MISSING</span>
+                      )}
                       {agent.type === 'remote' && (
                         <span style={{ fontSize: '9px', letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', padding: '1px 4px', fontFamily: 'var(--font-mono)', lineHeight: '14px' }}>REMOTE</span>
                       )}
@@ -402,7 +391,11 @@ export default function DashboardView() {
                     Unregister
                     </button>
                   </div>
-                  {agent.description && (
+                  {isMissing ? (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--status-error)', lineHeight: '1.4', marginTop: '4px', paddingLeft: '22px' }}>
+                      Directory not found — unregister to remove
+                    </div>
+                  ) : agent.description && (
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--fg-muted)', lineHeight: '1.4', marginTop: '4px', paddingLeft: '22px' }}>
                       {agent.type === 'remote' ? 'Remote agent' : agent.description}
                     </div>
