@@ -47,7 +47,7 @@ function getToolMeta(name: string) {
 
 export default function ChatView() {
   const { serverUrl, apiToken, serverReady, activeAgent } = useApp();
-  const [agentName, setAgentName] = useState('Atlas');
+  const [agentName, setAgentName] = useState(activeAgent || 'Agent');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
