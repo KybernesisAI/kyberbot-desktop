@@ -20,12 +20,13 @@ interface EditableAgent {
 }
 
 export default function OrchOrgChart({ orch }: Props) {
-  const { orgChart, company, updateCompany, agentIdentities, setOrgNode, loading, settings, updateSettings } = orch;
+  const { orgChart, company, updateCompany, agentIdentities, fleetAgentNames, setOrgNode, removeOrgNode, loading, settings, updateSettings } = orch;
   const [editing, setEditing] = useState(false);
   const [compName, setCompName] = useState('');
   const [compDesc, setCompDesc] = useState('');
   const [agents, setAgents] = useState<EditableAgent[]>([]);
   const [saving, setSaving] = useState(false);
+  const [removedKeys, setRemovedKeys] = useState<Set<string>>(new Set());
 
   // Settings edit state
   const [heartbeatInterval, setHeartbeatInterval] = useState('30m');
@@ -34,27 +35,29 @@ export default function OrchOrgChart({ orch }: Props) {
   const [activeHoursStart, setActiveHoursStart] = useState('09:00');
   const [activeHoursEnd, setActiveHoursEnd] = useState('17:00');
 
-  // Sync edit state when entering edit mode
+  // Sync edit state ONLY when entering edit mode — not on every poll cycle.
+  // company/settings/orgChart refs change every 5s from polling, so they
+  // must NOT be in the dependency array or they'll reset unsaved edits.
   useEffect(() => {
-    if (editing) {
-      setCompName(company?.name || '');
-      setCompDesc(company?.description || '');
-      setAgents(orgChart.map(n => ({
-        key: n.agent_name,
-        name: n.title || n.agent_name,
-        role: n.role,
-        is_ceo: n.is_ceo,
-      })));
-      // Sync settings
-      if (settings) {
-        setHeartbeatInterval(settings.heartbeat_interval);
-        setOrchEnabled(settings.orchestration_enabled);
-        setActiveHoursEnabled(settings.active_hours !== null);
-        setActiveHoursStart(settings.active_hours?.start || '09:00');
-        setActiveHoursEnd(settings.active_hours?.end || '17:00');
-      }
+    if (!editing) return;
+    setCompName(company?.name || '');
+    setCompDesc(company?.description || '');
+    setAgents(orgChart.map(n => ({
+      key: n.agent_name,
+      name: n.title || n.agent_name,
+      role: n.role,
+      is_ceo: n.is_ceo,
+    })));
+    setRemovedKeys(new Set());
+    if (settings) {
+      setHeartbeatInterval(settings.heartbeat_interval);
+      setOrchEnabled(settings.orchestration_enabled);
+      setActiveHoursEnabled(settings.active_hours !== null);
+      setActiveHoursStart(settings.active_hours?.start || '09:00');
+      setActiveHoursEnd(settings.active_hours?.end || '17:00');
     }
-  }, [editing, company, settings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
 
   if (loading) return <div style={{ padding: 16, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>Loading...</div>;
 
@@ -75,12 +78,20 @@ export default function OrchOrgChart({ orch }: Props) {
     setAgents(prev => prev.map(a => ({ ...a, is_ceo: a.key === key })));
   };
 
-  const handleUpdateRole = (key: string, role: string) => {
-    setAgents(prev => prev.map(a => a.key === key ? { ...a, role } : a));
+  const handleAddAgent = (key: string) => {
+    const identity = agentIdentities.find(a => a.key === key);
+    setAgents(prev => [...prev, {
+      key,
+      name: identity?.name || key,
+      role: identity?.description || 'Team Member',
+      is_ceo: false,
+    }]);
+    setRemovedKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
   };
 
-  const handleUpdateName = (key: string, name: string) => {
-    setAgents(prev => prev.map(a => a.key === key ? { ...a, name } : a));
+  const handleRemoveAgent = (key: string) => {
+    setAgents(prev => prev.filter(a => a.key !== key));
+    setRemovedKeys(prev => new Set(prev).add(key));
   };
 
   const handleSave = async () => {
@@ -88,14 +99,20 @@ export default function OrchOrgChart({ orch }: Props) {
     try {
       await updateCompany({ name: compName.trim() || 'My Company', description: compDesc.trim() || undefined });
 
+      // Remove agents that were taken out of orchestration
+      for (const key of removedKeys) {
+        await removeOrgNode(key);
+      }
+
       const newCeo = agents.find(a => a.is_ceo);
       const ceoKey = newCeo?.key || agents[0]?.key;
 
-      // Save CEO first
+      // Save CEO first — always use identity.yaml name/description as source of truth
       if (newCeo) {
+        const id = agentIdentities.find(a => a.key === newCeo.key);
         await setOrgNode(newCeo.key, {
-          role: newCeo.role,
-          title: newCeo.name,
+          role: id?.description || newCeo.role,
+          title: id?.name || newCeo.name,
           reports_to: null,
           is_ceo: true,
         });
@@ -103,9 +120,10 @@ export default function OrchOrgChart({ orch }: Props) {
       // Then workers
       for (const agent of agents) {
         if (agent.key === ceoKey) continue;
+        const id = agentIdentities.find(a => a.key === agent.key);
         await setOrgNode(agent.key, {
-          role: agent.role,
-          title: agent.name,
+          role: id?.description || agent.role,
+          title: id?.name || agent.name,
           reports_to: ceoKey,
           is_ceo: false,
         });
@@ -167,37 +185,92 @@ export default function OrchOrgChart({ orch }: Props) {
 
         {/* Agent list */}
         <div style={{ width: '100%', maxWidth: '420px', marginBottom: '24px' }}>
-          <label style={labelStyle}>Team</label>
+          <label style={labelStyle}>Team ({agents.length})</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {agents.map(agent => (
-              <div key={agent.key} style={{
-                padding: '10px 12px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
-                display: 'flex', gap: '8px', alignItems: 'center',
-              }}>
-                <div style={{ flex: 1 }}>
-                  <input
-                    value={agent.name}
-                    onChange={e => handleUpdateName(agent.key, e.target.value)}
-                    style={{ ...inputStyle, marginBottom: '4px', background: 'var(--bg-secondary)' }}
-                    placeholder="Display name"
-                  />
-                  <input
-                    value={agent.role}
-                    onChange={e => handleUpdateRole(agent.key, e.target.value)}
-                    style={{ ...inputStyle, fontSize: '10px', background: 'var(--bg-secondary)' }}
-                    placeholder="Role / description"
-                  />
-                </div>
-                <span style={{
-                  fontSize: '9px', fontFamily: 'var(--font-mono)', flexShrink: 0,
-                  color: agent.is_ceo ? 'var(--accent-teal)' : 'var(--fg-muted)',
-                  textTransform: 'uppercase', letterSpacing: '1px',
+            {agents.map(agent => {
+              const identity = agentIdentities.find(a => a.key === agent.key);
+              return (
+                <div key={agent.key} style={{
+                  padding: '10px 12px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)',
+                  display: 'flex', gap: '8px', alignItems: 'center',
                 }}>
-                  {agent.is_ceo ? 'CEO' : 'member'}
-                </span>
-              </div>
-            ))}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--fg-primary)', marginBottom: '2px' }}>
+                      {identity?.name || agent.name}
+                    </div>
+                    <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>
+                      {identity?.description || agent.role}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                    <span style={{
+                      fontSize: '9px', fontFamily: 'var(--font-mono)',
+                      color: agent.is_ceo ? 'var(--accent-teal)' : 'var(--fg-muted)',
+                      textTransform: 'uppercase', letterSpacing: '1px',
+                    }}>
+                      {agent.is_ceo ? 'CEO' : 'member'}
+                    </span>
+                    {!agent.is_ceo && (
+                      <button
+                        onClick={() => handleRemoveAgent(agent.key)}
+                        style={{
+                          fontSize: '9px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase',
+                          letterSpacing: '0.5px', color: 'var(--status-error)', background: 'none',
+                          border: 'none', cursor: 'pointer', padding: '2px 4px',
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+
+          {/* Available agents not in orchestration */}
+          {(() => {
+            const agentKeys = new Set(agents.map(a => a.key));
+            const available = fleetAgentNames.filter(name => !agentKeys.has(name));
+            if (available.length === 0) return null;
+            return (
+              <div style={{ marginTop: '12px' }}>
+                <label style={{ ...labelStyle, marginBottom: '6px' }}>Available Agents</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {available.map(name => {
+                    const identity = agentIdentities.find(a => a.key === name);
+                    return (
+                      <div key={name} style={{
+                        padding: '8px 12px', border: '1px dashed var(--border-color)', background: 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      }}>
+                        <div>
+                          <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--fg-secondary)' }}>
+                            {identity?.name || name}
+                          </span>
+                          {identity?.description && (
+                            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', marginLeft: '8px' }}>
+                              {identity.description}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleAddAgent(name)}
+                          style={{
+                            fontSize: '9px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase',
+                            letterSpacing: '1px', color: 'var(--accent-teal)', background: 'none',
+                            border: '1px solid var(--accent-teal)', cursor: 'pointer', padding: '4px 10px',
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Orchestration Settings */}
