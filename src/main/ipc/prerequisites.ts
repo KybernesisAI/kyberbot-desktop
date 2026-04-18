@@ -112,19 +112,6 @@ function findNodeBinary(): string | null {
   return null;
 }
 
-/**
- * Get the Node binary that was used to build the CLI (locked at install time).
- * Falls back to findNodeBinary() if no lock file exists.
- */
-function getLockedNodeBinary(): string | null {
-  const lockFile = join(HOME, '.kyberbot', 'node_path');
-  try {
-    const locked = readFileSync(lockFile, 'utf-8').trim();
-    if (existsSync(locked)) return locked;
-  } catch { /* no lock file */ }
-  return findNodeBinary();
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // BINARY DETECTION (fully async, never blocks)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -322,13 +309,12 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
     }
     log += `Using Node: ${nodeBin}\n`;
 
-    // Verify Node version is in our supported range (20-24)
     const nodeVersionResult = await runCmd(`"${nodeBin}" --version`, { timeoutMs: 5000 });
     if (nodeVersionResult.ok) {
       const match = nodeVersionResult.output.match(/v(\d+)/);
       const major = match ? parseInt(match[1]) : 0;
-      if (major < 20 || major >= 25) {
-        return { ok: false, stdout: log, stderr: `Node ${nodeVersionResult.output.trim()} is not supported. Install Node 20 or 22 LTS.` };
+      if (major < 18) {
+        return { ok: false, stdout: log, stderr: `Node ${nodeVersionResult.output.trim()} is too old. Install Node 18 or newer.` };
       }
       log += `Node version: ${nodeVersionResult.output.trim()} ✓\n`;
     }
@@ -369,56 +355,25 @@ async function installKyberbotCli(): Promise<{ ok: boolean; stdout: string; stde
       return { ok: false, stdout: log, stderr: 'Build failed' };
     }
 
-    // ── Step 6: Lock the Node binary ──
-    // Save the exact Node path used during this build.
-    // The wrapper will use THIS binary, preventing MODULE_VERSION mismatches.
-    const lockFile = join(HOME, '.kyberbot', 'node_path');
-    writeFileSync(lockFile, nodeBin, 'utf-8');
-    log += `Locked Node binary: ${nodeBin}\n`;
-
-    // ── Step 7: Create bash wrapper ──
+    // ── Step 6: Create bash wrapper ──
     const binDir = join(HOME, '.kyberbot', 'bin');
     const binPath = join(binDir, 'kyberbot');
     const cliEntry = join(sourceDir, 'packages', 'cli', 'dist', 'index.js');
     mkdirSync(binDir, { recursive: true });
 
-    // The wrapper uses the LOCKED Node binary — the same one that compiled better-sqlite3.
-    // If the locked binary is missing, it falls back to discovery.
-    // If there's a MODULE_VERSION mismatch, it auto-rebuilds better-sqlite3.
     const wrapper = `#!/bin/bash
 # KyberBot CLI — installed by KyberBot Desktop
-# Node binary is locked to the version used during build to prevent
-# MODULE_VERSION mismatches with better-sqlite3.
 
-LOCK_FILE="$HOME/.kyberbot/node_path"
 CLI_ENTRY="${cliEntry}"
-SOURCE_DIR="${sourceDir}"
 
-# Read locked Node binary
-if [ -f "$LOCK_FILE" ]; then
-  NODE=$(cat "$LOCK_FILE")
+if [ -d "$HOME/.nvm/versions/node" ]; then
+  NODE=$(ls -d "$HOME/.nvm/versions/node"/v*/bin/node 2>/dev/null | sort -V | tail -1)
 fi
+[ -z "$NODE" ] && [ -x /usr/local/bin/node ] && NODE=/usr/local/bin/node
+[ -z "$NODE" ] && [ -x /opt/homebrew/bin/node ] && NODE=/opt/homebrew/bin/node
+[ -z "$NODE" ] && NODE=$(which node 2>/dev/null)
+[ -z "$NODE" ] && echo "Error: Node.js not found" && exit 1
 
-# Verify locked binary exists
-if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
-  if [ -d "$HOME/.nvm/versions/node" ]; then
-    NODE=$(ls -d "$HOME/.nvm/versions/node"/v*/bin/node 2>/dev/null | sort -V | tail -1)
-  fi
-  [ -z "$NODE" ] && [ -x /usr/local/bin/node ] && NODE=/usr/local/bin/node
-  [ -z "$NODE" ] && [ -x /opt/homebrew/bin/node ] && NODE=/opt/homebrew/bin/node
-  [ -z "$NODE" ] && NODE=$(which node 2>/dev/null)
-  [ -z "$NODE" ] && echo "Error: Node.js not found" && exit 1
-fi
-
-# Quick sanity check for MODULE_VERSION mismatch (runs --version which is fast)
-CHECK=$("$NODE" "$CLI_ENTRY" --version 2>&1)
-if echo "$CHECK" | grep -q "NODE_MODULE_VERSION"; then
-  echo "Rebuilding better-sqlite3 for current Node version..."
-  cd "$SOURCE_DIR" && pnpm rebuild better-sqlite3 2>/dev/null
-  echo "$NODE" > "$LOCK_FILE"
-fi
-
-# Run KyberBot — output streams directly (not captured)
 exec "$NODE" "$CLI_ENTRY" "$@"
 `;
 
