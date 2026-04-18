@@ -67,11 +67,10 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
     setTimeout(() => { setInstalling(null); setInstallLog(''); }, 5000);
   };
 
-  // Node must be >= 20
   const nodeVersionOk = (() => {
     if (!status?.node?.version) return false;
     const match = status.node.version.match(/v?(\d+)/);
-    return match ? parseInt(match[1]) >= 20 : false;
+    return match ? parseInt(match[1]) >= 18 : false;
   })();
 
   const allOk = status?.node.installed && nodeVersionOk && status?.docker.installed && status?.docker.running && status?.claude.installed && status?.kyberbot.installed;
@@ -91,7 +90,7 @@ export default function PrerequisiteCheck({ onPassed }: PrerequisiteCheckProps) 
           ok={status?.node?.installed && nodeVersionOk}
           version={status?.node?.version}
           description="JavaScript runtime — required for KyberBot and Claude Code"
-          detail={status?.node?.installed && !nodeVersionOk ? 'Node 20 or 22 LTS required — your version is too old. Click Install to upgrade.' : undefined}
+          detail={status?.node?.installed && !nodeVersionOk ? 'Node 18 or newer required — your version is too old. Click Install to upgrade.' : undefined}
           notInstalledAction={
             <button
               onClick={installNode}
