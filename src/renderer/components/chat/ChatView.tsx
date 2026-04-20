@@ -100,7 +100,14 @@ export default function ChatView() {
   // Load most recent session on mount and on agent switch
   useEffect(() => {
     if (!serverReady) return;
-    // Clear current messages when switching agents
+    // Abort any in-flight chat stream from the previous agent so its
+    // events do not leak into this view after the switch.
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStreaming(false);
+    setStreamText('');
+    setStreamStatus('');
+    setStreamTools([]);
     setMessages([]);
     setSessionId(undefined);
     const loadMostRecent = async () => {
