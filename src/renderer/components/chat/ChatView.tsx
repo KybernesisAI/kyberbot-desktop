@@ -45,9 +45,10 @@ function getToolMeta(name: string) {
   return TOOL_META[name] || { icon: '\u25CF', color: '#71717a' };
 }
 
-export default function ChatView() {
-  const { serverUrl, apiToken, serverReady, activeAgent } = useApp();
-  const [agentName, setAgentName] = useState(activeAgent || 'Agent');
+export default function ChatView({ agent }: { agent: string }) {
+  const { resolveAgentConnection, serverReady } = useApp();
+  const { serverUrl, apiToken } = resolveAgentConnection(agent);
+  const [agentName, setAgentName] = useState(agent || 'Agent');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -57,6 +58,10 @@ export default function ChatView() {
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [claudeModel, setClaudeModel] = useState('opus');
   const [attachments, setAttachments] = useState<Array<{ name: string; dataUrl: string; preview: string }>>([]);
+  // Incremented whenever the agent edits SOUL.md / USER.md / HEARTBEAT.md
+  // mid-stream so the memory-block sidebar refetches and shows the change
+  // immediately rather than waiting for a remount.
+  const [memoryRefreshKey, setMemoryRefreshKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -95,21 +100,14 @@ export default function ChatView() {
       if (id?.claude?.model) setClaudeModel(id.claude.model);
     };
     loadIdentity();
-  }, [activeAgent, serverUrl]);
+  }, [agent, serverUrl]);
 
-  // Load most recent session on mount and on agent switch
+  // Load most recent session once this ChatView mounts for its agent. Each
+  // agent has its own ChatView instance so this effect never fires on a
+  // "switch" — `agent` is fixed per instance. Streams for this agent keep
+  // running across navigation because the instance stays mounted.
   useEffect(() => {
     if (!serverReady) return;
-    // Abort any in-flight chat stream from the previous agent so its
-    // events do not leak into this view after the switch.
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setStreaming(false);
-    setStreamText('');
-    setStreamStatus('');
-    setStreamTools([]);
-    setMessages([]);
-    setSessionId(undefined);
     const loadMostRecent = async () => {
       try {
         const res = await fetch(`${serverUrl}/api/web/sessions`, { headers: authHeaders() });
@@ -122,7 +120,7 @@ export default function ChatView() {
       } catch {}
     };
     loadMostRecent();
-  }, [serverReady, activeAgent]);
+  }, [serverReady, agent]);
 
   // Create a new session on the server
   const createSession = useCallback(async (): Promise<string | null> => {
@@ -292,9 +290,11 @@ export default function ChatView() {
                     const toolName = t.name;
                     const toolDetail = t.detail || '';
                     if ((toolName === 'Edit' || toolName === 'Write') && data.success) {
-                      if (toolDetail.includes('SOUL')) memoryUpdates.push('soul');
-                      else if (toolDetail.includes('USER')) memoryUpdates.push('user');
-                      else if (toolDetail.includes('HEARTBEAT')) memoryUpdates.push('heartbeat');
+                      let touchedMemory = false;
+                      if (toolDetail.includes('SOUL')) { memoryUpdates.push('soul'); touchedMemory = true; }
+                      else if (toolDetail.includes('USER')) { memoryUpdates.push('user'); touchedMemory = true; }
+                      else if (toolDetail.includes('HEARTBEAT')) { memoryUpdates.push('heartbeat'); touchedMemory = true; }
+                      if (touchedMemory) setMemoryRefreshKey(k => k + 1);
                     }
                     setStreamTools([...tools]);
                   }
@@ -498,9 +498,16 @@ export default function ChatView() {
             ref={textareaRef}
             value={input}
             onChange={(e) => { setInput(e.target.value); autoResizeTextarea(); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+            onKeyDown={(e) => {
+              // Only Enter sends, and only when not streaming. During streaming,
+              // Enter falls through to its default (insert a newline) so the
+              // user can keep drafting without accidentally trying to submit.
+              if (e.key === 'Enter' && !e.shiftKey && !streaming) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
             placeholder={`Message ${agentName}...`}
-            disabled={streaming}
             rows={1}
             style={{
               flex: 1, padding: '4px 0', fontSize: '13px', fontFamily: 'var(--font-mono)',
@@ -535,7 +542,7 @@ export default function ChatView() {
 
       {/* Sidebar — memory blocks, sessions, agent config */}
       <div style={{ width: '340px', padding: '14px', background: 'var(--bg-primary)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <MemoryBlocks />
+        <MemoryBlocks refreshKey={memoryRefreshKey} />
         <SessionList
           currentSessionId={sessionId}
           onSelectSession={loadSession}
