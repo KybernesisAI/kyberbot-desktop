@@ -53,6 +53,13 @@ interface AppContextValue {
   setActiveAgent: (name: string) => void;
   fleetStatus: FleetStatusData | null;
   runningAgentRoot: string | null;
+
+  /**
+   * Resolve the serverUrl and apiToken for any agent by name — not just the
+   * active one. Used by per-agent ChatView instances that need to talk to
+   * their specific agent even when another is in the foreground.
+   */
+  resolveAgentConnection: (name: string) => { serverUrl: string; apiToken: string | null };
 }
 
 const AppContext = createContext<AppContextValue>({
@@ -61,6 +68,7 @@ const AppContext = createContext<AppContextValue>({
   health: null, cliStatus: 'stopped', isReady: false, serverReady: false,
   fleetMode: false, agents: [], activeAgent: null,
   setActiveAgent: () => {}, fleetStatus: null, runningAgentRoot: null,
+  resolveAgentConnection: () => ({ serverUrl: 'http://localhost:3456', apiToken: null }),
 });
 
 export function useApp(): AppContextValue {
@@ -357,12 +365,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [agentRoot, activeAgent, isReady]);
 
+  const resolveAgentConnection = useCallback((name: string) => {
+    const info = agents.find(a => a.name.toLowerCase() === name.toLowerCase());
+    if (info?.type === 'remote' && info.remoteUrl) {
+      return { serverUrl: info.remoteUrl, apiToken: info.remoteToken || null };
+    }
+    if (fleetMode) {
+      return {
+        serverUrl: `${baseServerUrl}/agent/${encodeURIComponent(name.toLowerCase())}`,
+        apiToken,
+      };
+    }
+    return { serverUrl: baseServerUrl, apiToken };
+  }, [agents, fleetMode, baseServerUrl, apiToken]);
+
   return (
     <AppContext.Provider value={{
       agentRoot, apiToken, serverUrl, baseServerUrl, health,
       cliStatus, isReady, serverReady,
       fleetMode, agents, activeAgent, setActiveAgent, fleetStatus,
-      runningAgentRoot,
+      runningAgentRoot, resolveAgentConnection,
     }}>
       {children}
     </AppContext.Provider>

@@ -3,7 +3,7 @@
  * Sidebar-based layout.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import TitleBar from './components/layout/TitleBar';
 import Sidebar, { type NavId } from './components/layout/Sidebar';
@@ -22,7 +22,17 @@ function AppContent() {
   const [activeNav, setActiveNav] = useState<NavId>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const { isReady, agentRoot } = useApp();
+  const { isReady, agentRoot, agents, activeAgent, fleetMode } = useApp();
+
+  // In fleet mode we render one ChatView per agent (kept mounted after first
+  // visit) so each agent's conversation and any in-flight streaming survives
+  // switching away and back. In single-agent mode there's only ever one
+  // agent, so a single ChatView is fine.
+  const [visitedChatAgents, setVisitedChatAgents] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeAgent) return;
+    setVisitedChatAgents(prev => (prev.has(activeAgent) ? prev : new Set(prev).add(activeAgent)));
+  }, [activeAgent]);
 
   if (!isReady) {
     return (
@@ -67,9 +77,27 @@ function AppContent() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
       <Sidebar activeNav={activeNav} onNavChange={setActiveNav} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-        {/* Chat stays mounted always so streaming isn't interrupted by tab switches */}
+        {/* One ChatView per agent, all kept mounted once visited so each
+            agent's conversation and any in-flight streaming continues in the
+            background when the user switches between agents. Only the active
+            agent's view is visible; the rest are display:none. */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: activeNav === 'chat' ? 'block' : 'none' }}>
-          <ChatView />
+          {fleetMode
+            ? agents
+                .filter(a => visitedChatAgents.has(a.name))
+                .map(a => (
+                  <div
+                    key={a.name}
+                    style={{
+                      position: 'absolute',
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      display: activeAgent?.toLowerCase() === a.name.toLowerCase() ? 'block' : 'none',
+                    }}
+                  >
+                    <ChatView agent={a.name} />
+                  </div>
+                ))
+            : activeAgent && <ChatView agent={activeAgent} />}
         </div>
         {/* Other views mount/unmount normally */}
         {activeNav === 'dashboard' && <DashboardView />}

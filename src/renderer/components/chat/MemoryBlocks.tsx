@@ -21,7 +21,7 @@ const BLOCK_META: Record<BlockName, { label: string; description: string; color:
   heartbeat: { label: 'HEARTBEAT.MD', description: 'Recurring tasks and their cadence', color: '#10b981' },
 };
 
-export default function MemoryBlocks() {
+export default function MemoryBlocks({ refreshKey = 0 }: { refreshKey?: number }) {
   const { serverUrl, apiToken, serverReady, activeAgent } = useApp();
   const [blocks, setBlocks] = useState<Record<BlockName, BlockData>>({
     soul: { content: '', lastModified: '' },
@@ -72,7 +72,7 @@ export default function MemoryBlocks() {
     }
   }, [blocks, serverReady]);
 
-  useEffect(() => { fetchBlocks(); }, [fetchBlocks]);
+  useEffect(() => { fetchBlocks(); }, [fetchBlocks, refreshKey]);
 
   const saveBlock = async (name: string, content: string) => {
     setSaving(true);
