@@ -146,6 +146,16 @@ const api = {
       ipcRenderer.on('fleet:status-update', handler);
       return () => ipcRenderer.removeListener('fleet:status-update', handler);
     },
+    // Symphony-style snapshot API. Renderers should prefer these over
+    // list/getStatus for live observability views.
+    v1: {
+      state: (): Promise<{ ok: boolean; data?: any; error?: string }> =>
+        ipcRenderer.invoke('fleet:v1:state'),
+      agent: (name: string): Promise<{ ok: boolean; data?: any; error?: string }> =>
+        ipcRenderer.invoke('fleet:v1:agent', name),
+      refresh: (): Promise<{ ok: boolean; queued?: boolean; coalesced?: boolean; error?: string }> =>
+        ipcRenderer.invoke('fleet:v1:refresh'),
+    },
   },
 };
 

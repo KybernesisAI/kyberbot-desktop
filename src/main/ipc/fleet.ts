@@ -308,4 +308,59 @@ export function registerFleetHandlers(
       }
     });
   }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // /api/v1 snapshot handlers (Symphony-style observability contract)
+  //
+  // These are independent of the LifecycleManager — the fleet HTTP server
+  // is the source of truth. Renderers should prefer these over fleet:list
+  // for live status views.
+  // ──────────────────────────────────────────────────────────────────────
+
+  ipcMain.handle('fleet:v1:state', async () => {
+    try {
+      const port = getFleetServerPort();
+      const res = await fetch(`http://localhost:${port}/api/v1/state`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        return { ok: false, error: `HTTP ${res.status}` };
+      }
+      return { ok: true, data: await res.json() };
+    } catch (err: any) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('fleet:v1:agent', async (_event, name: string) => {
+    try {
+      const port = getFleetServerPort();
+      const res = await fetch(`http://localhost:${port}/api/v1/agents/${encodeURIComponent(name)}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { ok: false, error: data?.error?.message ?? `HTTP ${res.status}` };
+      }
+      return { ok: true, data };
+    } catch (err: any) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('fleet:v1:refresh', async () => {
+    try {
+      const port = getFleetServerPort();
+      const res = await fetch(`http://localhost:${port}/api/v1/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await res.json();
+      return { ok: res.ok, ...data };
+    } catch (err: any) {
+      return { ok: false, error: err.message };
+    }
+  });
 }
