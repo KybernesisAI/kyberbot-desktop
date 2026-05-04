@@ -8,7 +8,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import type {
   OrchDashboardData, OrchIssue, OrchGoal, OrchComment, OrchCompany,
-  OrchInboxItem, OrchActivityEntry, OrchOrgNode, OrchAgentIdentity, IssueStatus,
+  OrchInboxItem, OrchInboxItemWithArtifacts,
+  OrchActivityEntry, OrchOrgNode, OrchAgentIdentity, IssueStatus,
   OrchHeartbeatRun, OrchSettings, OrchProject, OrchArtifact,
 } from '../components/orchestration/types';
 
@@ -45,6 +46,10 @@ export interface UseOrchResult {
   inboxItems: OrchInboxItem[];
   archivedInboxItems: OrchInboxItem[];
   inboxCount: number;
+  /** Completed-task notifications (kind='completed') with joined artifacts. */
+  completedItems: OrchInboxItemWithArtifacts[];
+  /** Pending count just for the Completed tab. */
+  completedPendingCount: number;
   activity: OrchActivityEntry[];
   artifacts: OrchArtifact[];
   runs: OrchHeartbeatRun[];
@@ -63,6 +68,7 @@ export interface UseOrchResult {
   // Mutations — Issues
   createIssue: (data: Partial<OrchIssue>) => Promise<void>;
   updateIssue: (id: number, data: Partial<OrchIssue>) => Promise<void>;
+  deleteIssue: (id: number) => Promise<void>;
   moveIssue: (id: number, newStatus: IssueStatus) => Promise<void>;
   addComment: (issueId: number, content: string) => Promise<void>;
 
@@ -112,6 +118,8 @@ export function useOrch(): UseOrchResult {
   const [inboxItems, setInboxItems] = useState<OrchInboxItem[]>([]);
   const [archivedInboxItems, setArchivedInboxItems] = useState<OrchInboxItem[]>([]);
   const [inboxCount, setInboxCount] = useState(0);
+  const [completedItems, setCompletedItems] = useState<OrchInboxItemWithArtifacts[]>([]);
+  const [completedPendingCount, setCompletedPendingCount] = useState(0);
   const [activity, setActivity] = useState<OrchActivityEntry[]>([]);
   const [issueComments, setIssueComments] = useState<OrchComment[]>([]);
   const [agentIdentities, setAgentIdentities] = useState<OrchAgentIdentity[]>([]);
@@ -135,13 +143,17 @@ export function useOrch(): UseOrchResult {
     const signal = abortRef.current.signal;
 
     try {
-      const [dashRes, issuesRes, goalsRes, orgRes, inboxRes, allInboxRes, activityRes, agentsRes, runsRes, settingsRes, projectsRes, artifactsRes] = await Promise.all([
+      const [dashRes, issuesRes, goalsRes, orgRes, inboxRes, allInboxRes, completedRes, activityRes, agentsRes, runsRes, settingsRes, projectsRes, artifactsRes] = await Promise.all([
         orchFetch<OrchDashboardData>(serverUrl, apiToken, '/dashboard', {}, signal),
         orchFetch<{ issues: OrchIssue[] }>(serverUrl, apiToken, '/issues', {}, signal),
         orchFetch<{ goals: OrchGoal[] }>(serverUrl, apiToken, '/goals', {}, signal),
         orchFetch<{ nodes: OrchOrgNode[] }>(serverUrl, apiToken, '/org', {}, signal),
-        orchFetch<{ items: OrchInboxItem[] }>(serverUrl, apiToken, '/inbox?status=pending', {}, signal),
-        orchFetch<{ items: OrchInboxItem[] }>(serverUrl, apiToken, '/inbox', {}, signal).catch(() => ({ items: [] as OrchInboxItem[] })),
+        // Action-required pane: pending escalations only
+        orchFetch<{ items: OrchInboxItem[] }>(serverUrl, apiToken, '/inbox?status=pending&kind=needs_action', {}, signal).catch(() => ({ items: [] as OrchInboxItem[] })),
+        // Archived needs_action items (acknowledged/resolved) for the existing archive expander
+        orchFetch<{ items: OrchInboxItem[] }>(serverUrl, apiToken, '/inbox?kind=needs_action', {}, signal).catch(() => ({ items: [] as OrchInboxItem[] })),
+        // Completed-task notifications with joined artifacts
+        orchFetch<{ items: OrchInboxItemWithArtifacts[] }>(serverUrl, apiToken, '/inbox?kind=completed&includeArtifacts=true&limit=100', {}, signal).catch(() => ({ items: [] as OrchInboxItemWithArtifacts[] })),
         orchFetch<{ entries: OrchActivityEntry[] }>(serverUrl, apiToken, '/activity?limit=50', {}, signal),
         orchFetch<{ agents: OrchAgentIdentity[] }>(serverUrl, apiToken, '/agents', {}, signal),
         orchFetch<{ runs: OrchHeartbeatRun[] }>(serverUrl, apiToken, '/runs?limit=20', {}, signal).catch(() => ({ runs: [] as OrchHeartbeatRun[] })),
@@ -156,6 +168,8 @@ export function useOrch(): UseOrchResult {
       setInboxItems(inboxRes.items);
       setInboxCount(inboxRes.items.length);
       setArchivedInboxItems(allInboxRes.items.filter((i: OrchInboxItem) => i.status !== 'pending'));
+      setCompletedItems(completedRes.items);
+      setCompletedPendingCount(completedRes.items.filter(i => i.status === 'pending').length);
       setActivity(activityRes.entries);
       setAgentIdentities(agentsRes.agents);
       setRuns(runsRes.runs);
@@ -209,6 +223,11 @@ export function useOrch(): UseOrchResult {
 
   const updateIssue = useCallback(async (id: number, data: Partial<OrchIssue>) => {
     await orchFetch(serverUrl, apiToken, `/issues/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    await fetchAll();
+  }, [serverUrl, apiToken, fetchAll]);
+
+  const deleteIssue = useCallback(async (id: number) => {
+    await orchFetch(serverUrl, apiToken, `/issues/${id}`, { method: 'DELETE', body: JSON.stringify({ actor: 'human' }) });
     await fetchAll();
   }, [serverUrl, apiToken, fetchAll]);
 
@@ -342,9 +361,10 @@ export function useOrch(): UseOrchResult {
 
   return {
     dashboard, issues, goals, projects, orgChart, inboxItems, inboxCount, activity,
+    completedItems, completedPendingCount,
     artifacts, runs, settings,
     loading, error, apiUnavailable, issueComments, loadIssueComments, loadArtifactContent,
-    createIssue, updateIssue, moveIssue, createGoal, updateGoal, deleteGoal, addComment, resolveInboxItem, dismissInboxItem, dismissAllInbox, archivedInboxItems,
+    createIssue, updateIssue, deleteIssue, moveIssue, createGoal, updateGoal, deleteGoal, addComment, resolveInboxItem, dismissInboxItem, dismissAllInbox, archivedInboxItems,
     createProject, updateProject, deleteProject,
     setOrgNode, removeOrgNode, initOrchestration,
     company, updateCompany: updateCompanyFn,

@@ -74,6 +74,8 @@ export interface OrchComment {
   created_at: string;
 }
 
+export type InboxKind = 'needs_action' | 'completed';
+
 export interface OrchInboxItem {
   id: number;
   source_agent: string;
@@ -81,10 +83,17 @@ export interface OrchInboxItem {
   body: string | null;
   urgency: 'high' | 'normal' | 'low';
   status: 'pending' | 'acknowledged' | 'resolved';
+  /** 'needs_action' = escalation; 'completed' = FYI completion notice. */
+  kind: InboxKind;
   related_issue_id: number | null;
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
+}
+
+/** OrchInboxItem with joined artifacts — populated when the API is queried with includeArtifacts=true. */
+export interface OrchInboxItemWithArtifacts extends OrchInboxItem {
+  artifacts: OrchArtifact[];
 }
 
 export interface OrchArtifact {

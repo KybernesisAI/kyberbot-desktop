@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function OrchIssueDetail({ issueId, orch, onClose }: Props) {
-  const { issues, issueComments, loadIssueComments, addComment, updateIssue, moveIssue, fleetAgentNames, projects } = orch;
+  const { issues, issueComments, loadIssueComments, addComment, updateIssue, deleteIssue, moveIssue, fleetAgentNames, projects } = orch;
   const [commentText, setCommentText] = useState('');
   const [sending, setSending] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -27,6 +27,8 @@ export default function OrchIssueDetail({ issueId, orch, onClose }: Props) {
   const [editProjectId, setEditProjectId] = useState('');
   const [editStatus, setEditStatus] = useState<IssueStatus>('todo');
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const issue = issues.find(i => i.id === issueId);
 
@@ -81,6 +83,14 @@ export default function OrchIssueDetail({ issueId, orch, onClose }: Props) {
       }
       setEditing(false);
     } finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteIssue(issueId);
+      onClose();
+    } finally { setDeleting(false); }
   };
 
   const inputStyle = {
@@ -169,13 +179,51 @@ export default function OrchIssueDetail({ issueId, orch, onClose }: Props) {
                 </select>
               </div>
             </div>
-            <div className="flex justify-end gap-2" style={{ marginTop: '4px' }}>
-              <button onClick={() => setEditing(false)} style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: 'transparent', color: 'var(--fg-muted)', border: '1px solid var(--border-color)', cursor: 'pointer' }}>
-                Cancel
-              </button>
-              <button onClick={handleSave} disabled={saving} style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: 'var(--accent-teal)', color: '#ffffff', border: 'none', cursor: 'pointer', opacity: saving ? 0.35 : 1 }}>
-                {saving ? 'Saving...' : 'Save'}
-              </button>
+            <div className="flex items-center justify-between gap-2" style={{ marginTop: '4px' }}>
+              {/* Left: Delete (with two-step confirmation, no modal) */}
+              <div className="flex items-center gap-2">
+                {confirmingDelete ? (
+                  <>
+                    <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                      Delete this issue?
+                    </span>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: '#ef4444', color: '#ffffff', border: 'none', cursor: 'pointer', opacity: deleting ? 0.35 : 1 }}
+                    >
+                      {deleting ? 'Deleting...' : 'Yes, Delete'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmingDelete(false)}
+                      disabled={deleting}
+                      style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: 'transparent', color: 'var(--fg-muted)', border: '1px solid var(--border-color)', cursor: 'pointer' }}
+                    >
+                      Keep
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingDelete(true)}
+                    disabled={saving || deleting}
+                    title="Permanently remove this issue"
+                    style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', cursor: 'pointer' }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+              {/* Right: Cancel + Save */}
+              {!confirmingDelete && (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setEditing(false)} disabled={saving} style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: 'transparent', color: 'var(--fg-muted)', border: '1px solid var(--border-color)', cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                  <button onClick={handleSave} disabled={saving} style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: 'var(--accent-teal)', color: '#ffffff', border: 'none', cursor: 'pointer', opacity: saving ? 0.35 : 1 }}>
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ) : (
