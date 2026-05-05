@@ -16,6 +16,20 @@ import { createTray, updateTrayStatus } from './tray.js';
 import { setupAutoUpdater } from './updater.js';
 import { IPC } from '../types/ipc.js';
 
+// Swallow EPIPE on the main process's stdout/stderr. When Electron is
+// launched as a backgrounded process whose parent shell exits, the pipe
+// closes underneath us — every subsequent console.log throws EPIPE and
+// (without this) bubbles to a "JavaScript error in the main process"
+// dialog. This is the canonical Node fix for "broken pipe" terminal
+// piping; safe in production where stdio is normally not piped.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EPIPE') return; // pipe closed — drop the write
+    // Anything else, surface
+    console.error('[main] stdio error', err);
+  });
+}
+
 const store = new AppStore();
 const lifecycle = new LifecycleManager(store);
 

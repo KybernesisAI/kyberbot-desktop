@@ -102,6 +102,37 @@ export default function OrchIssueDetail({ issueId, orch, onClose }: Props) {
     fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)',
     width: '60px', textTransform: 'uppercase' as const, letterSpacing: '1px', flexShrink: 0,
   };
+  // Shared base for the edit-mode action buttons. Every button in the
+  // bottom row uses this with a variant overlay, so Delete / Cancel /
+  // Save are exact-pixel size matches (same padding, same 1px border).
+  const btnBase: React.CSSProperties = {
+    fontSize: '10px',
+    fontFamily: 'var(--font-mono)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
+    padding: '6px 14px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    cursor: 'pointer',
+    boxSizing: 'border-box' as const,
+    lineHeight: 1,
+  };
+  const btnDelete: React.CSSProperties = {
+    ...btnBase,
+    background: 'transparent', borderColor: '#ef4444', color: '#ef4444',
+  };
+  const btnDeleteFilled: React.CSSProperties = {
+    ...btnBase,
+    background: '#ef4444', borderColor: '#ef4444', color: '#ffffff',
+  };
+  const btnCancel: React.CSSProperties = {
+    ...btnBase,
+    background: 'transparent', borderColor: 'var(--border-color)', color: 'var(--fg-muted)',
+  };
+  const btnSave: React.CSSProperties = {
+    ...btnBase,
+    background: 'var(--accent-teal)', borderColor: 'var(--accent-teal)', color: '#ffffff',
+  };
 
   return (
     <div style={{
@@ -179,50 +210,44 @@ export default function OrchIssueDetail({ issueId, orch, onClose }: Props) {
                 </select>
               </div>
             </div>
-            <div className="flex items-center justify-between gap-2" style={{ marginTop: '4px' }}>
-              {/* Left: Delete (with two-step confirmation, no modal) */}
-              <div className="flex items-center gap-2">
-                {confirmingDelete ? (
-                  <>
-                    <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                      Delete this issue?
-                    </span>
-                    <button
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: '#ef4444', color: '#ffffff', border: 'none', cursor: 'pointer', opacity: deleting ? 0.35 : 1 }}
-                    >
-                      {deleting ? 'Deleting...' : 'Yes, Delete'}
-                    </button>
-                    <button
-                      onClick={() => setConfirmingDelete(false)}
-                      disabled={deleting}
-                      style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: 'transparent', color: 'var(--fg-muted)', border: '1px solid var(--border-color)', cursor: 'pointer' }}
-                    >
-                      Keep
-                    </button>
-                  </>
-                ) : (
+            <div className="flex items-center justify-end gap-2" style={{ marginTop: '4px' }}>
+              {confirmingDelete ? (
+                <>
+                  <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '1px', marginRight: '4px' }}>
+                    Delete this issue?
+                  </span>
+                  <button
+                    onClick={() => setConfirmingDelete(false)}
+                    disabled={deleting}
+                    style={btnCancel}
+                  >
+                    Keep
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    style={{ ...btnDeleteFilled, opacity: deleting ? 0.35 : 1 }}
+                  >
+                    {deleting ? 'Deleting...' : 'Yes, Delete'}
+                  </button>
+                </>
+              ) : (
+                <>
                   <button
                     onClick={() => setConfirmingDelete(true)}
                     disabled={saving || deleting}
                     title="Permanently remove this issue"
-                    style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', cursor: 'pointer' }}
+                    style={btnDelete}
                   >
                     Delete
                   </button>
-                )}
-              </div>
-              {/* Right: Cancel + Save */}
-              {!confirmingDelete && (
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setEditing(false)} disabled={saving} style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: 'transparent', color: 'var(--fg-muted)', border: '1px solid var(--border-color)', cursor: 'pointer' }}>
+                  <button onClick={() => setEditing(false)} disabled={saving} style={btnCancel}>
                     Cancel
                   </button>
-                  <button onClick={handleSave} disabled={saving} style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 14px', background: 'var(--accent-teal)', color: '#ffffff', border: 'none', cursor: 'pointer', opacity: saving ? 0.35 : 1 }}>
+                  <button onClick={handleSave} disabled={saving} style={{ ...btnSave, opacity: saving ? 0.35 : 1 }}>
                     {saving ? 'Saving...' : 'Save'}
                   </button>
-                </div>
+                </>
               )}
             </div>
           </div>

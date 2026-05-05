@@ -1,6 +1,6 @@
 {
   "name": "KyberBot",
-  "version": "1.7.8",
+  "version": "1.7.9",
   "description": "KyberBot Desktop — Control panel for your KyberBot agents",
   "main": "dist-electron/main/index.cjs",
   "type": "module",
